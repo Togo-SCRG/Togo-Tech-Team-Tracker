@@ -18,24 +18,32 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// Runs before hydration so the correct theme class is present on first
-// paint — otherwise the page would flash the default theme and then
-// snap to the user's stored preference.
+// Dark is the default, and it's set on <html> in the markup below rather than
+// added by this script — so a first paint (or a session with JavaScript blocked,
+// or a script that fails) is dark rather than light.
+//
+// All this script does is *remove* the class for someone who has chosen light.
+// It runs before hydration, so that choice is applied on the first paint instead
+// of flashing dark and snapping to light a moment later.
 const themeInitScript = `
 (function () {
   try {
-    var stored = localStorage.getItem("togo-theme");
-    var theme = stored === "light" || stored === "dark" ? stored : "dark";
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    if (localStorage.getItem("togo-theme") === "light") {
+      document.documentElement.classList.remove("dark");
+    }
   } catch (e) {
-    document.documentElement.classList.add("dark");
+    // localStorage can throw in private mode. Dark is already applied, which is
+    // the default anyway, so there's nothing to recover from.
   }
 })();
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    // suppressHydrationWarning because the script above may have removed this
+    // class before React hydrates, which would otherwise be reported as a
+    // server/client mismatch.
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
