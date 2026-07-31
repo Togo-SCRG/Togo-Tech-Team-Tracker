@@ -13,9 +13,17 @@ export const metadata: Metadata = {
 
 // Default zoom/scale = 100% (width=device-width, initial-scale=1) —
 // explicit rather than relying on the browser's implicit default.
+//
+// colorScheme emits <meta name="color-scheme">, which the browser honours while
+// parsing — before globals.css has loaded. Without it a cold load paints the
+// default white canvas until the stylesheet arrives, which is why the site
+// flashed light on a first visit and looked correct on reload (CSS cached).
+// Dark first, so that's the canvas we get; the `light` fallback covers the
+// scrollbars and form controls of anyone who has chosen light.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  colorScheme: "dark light",
 };
 
 // Dark is the default, and it's set on <html> in the markup below rather than

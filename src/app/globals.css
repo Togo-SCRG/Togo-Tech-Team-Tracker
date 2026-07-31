@@ -4,6 +4,9 @@
 @tailwind utilities;
 
 :root {
+  /* Scrollbars and native form controls follow the theme, not the OS. */
+  color-scheme: light;
+
   /* Light theme — Togo blue on white */
   --togo-black: #ffffff;
   --togo-charcoal: #f3f4f6;
@@ -51,6 +54,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   /* Dark theme — Togo blue on deep navy */
   --togo-black: #050e1a;
   --togo-charcoal: #081322;
