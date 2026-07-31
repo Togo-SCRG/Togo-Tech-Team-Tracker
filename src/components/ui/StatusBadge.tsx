@@ -1,6 +1,13 @@
 "use client";
 
-import { cn, nextStatus } from "@/lib/utils";
+import { cn, nextStatus, STATUS_OPTIONS } from "@/lib/utils";
+
+/**
+ * The label every badge is sized to. Longest by character count, which for this
+ * set is "In Progress" / "Not Started" — if one of them renders a hair wider
+ * than the other it will expand past this, so keep new statuses no longer.
+ */
+const WIDEST_STATUS = [...STATUS_OPTIONS].sort((a, b) => b.length - a.length)[0];
 
 // Compact pill: tinted background + saturated text + hairline border.
 // Tints come from CSS variables so they adapt to light/dark themes.
@@ -38,7 +45,7 @@ export function StatusBadge({
         onClick?.(nextStatus(status));
       }}
       className={cn(
-        "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium whitespace-nowrap border",
+        "relative inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-medium whitespace-nowrap border",
         onClick && "cursor-pointer hover:opacity-80 transition-opacity",
         !onClick && "cursor-default",
         style,
@@ -46,7 +53,14 @@ export function StatusBadge({
       )}
       title={onClick ? "Click to change status" : undefined}
     >
-      {status}
+      {/* Sizer: an invisible copy of the longest label sets the width, so every
+          badge is exactly as wide as "In Progress" — measured in the real font
+          rather than guessed at in pixels, so it holds across fonts and zoom.
+          The visible label is overlaid on top and centred. */}
+      <span aria-hidden className="invisible">
+        {WIDEST_STATUS}
+      </span>
+      <span className="absolute inset-0 flex items-center justify-center">{status}</span>
     </button>
   );
 }

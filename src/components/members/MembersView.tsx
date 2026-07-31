@@ -29,6 +29,7 @@ import { useViewMode } from "@/lib/useViewMode";
 import { useSort } from "@/lib/useSort";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { useColumns } from "@/lib/useColumns";
+import { TEN_ROWS_PY25 } from "@/lib/tableHeights";
 import type { MemberItem, ClientItem, AccessLevel } from "@/types";
 
 interface MemberRow {
@@ -378,7 +379,7 @@ export function MembersView({ members }: { members: MemberRow[] }) {
           })}
         </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className={`overflow-x-auto ${TEN_ROWS_PY25}`}>
           <table className="w-full min-w-[600px] text-sm">
             <thead className="sticky top-0 z-10 bg-togo-surface">
               <tr className="border-b border-togo-border text-left">

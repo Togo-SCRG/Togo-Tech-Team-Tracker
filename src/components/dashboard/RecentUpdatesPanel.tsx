@@ -29,6 +29,17 @@ export interface RecentUpdateRow {
  */
 const GRID = "grid grid-cols-[26px_minmax(0,1fr)_minmax(0,1fr)_128px_72px_26px] gap-2";
 
+/**
+ * Ten rows, fixed.
+ *
+ * A row is the 24px avatar + 8px padding top and bottom + a 1px top border, so
+ * 41px; ten of them is 410px. Fixed rather than sized to content, so the panel
+ * doesn't shrink on a quiet day and the column beside it has a stable height to
+ * match. The page size is 10 by default, so it fits exactly; raise it and this
+ * scrolls instead of growing.
+ */
+const TEN_ROWS = "h-[410px]";
+
 export function RecentUpdatesPanel({ rows }: { rows: RecentUpdateRow[] }) {
   const { page, setPage, pageSize, setPageSize, totalPages, totalItems, paged } = usePagination(rows);
 
@@ -56,31 +67,33 @@ export function RecentUpdatesPanel({ rows }: { rows: RecentUpdateRow[] }) {
         <span />
       </div>
 
-      {paged.map((u) => (
-        <Link
-          key={u.id}
-          href="/tracker"
-          className={`${GRID} items-center border-t border-togo-border px-4 py-2 transition-colors hover:bg-[var(--togo-hover)]`}
-        >
-          <Avatar
-            name={u.authorName || "?"}
-            avatarUrl={u.authorAvatarUrl}
-            size="sm"
-            title={u.authorName || undefined}
-            className="!h-6 !w-6 !text-[10px]"
-          />
-          <span className="truncate text-xs font-medium text-togo-white">{u.project}</span>
-          <span className="truncate text-xs text-togo-muted">
-            {u.update || <span className="text-togo-faint">—</span>}
-          </span>
-          {/* justify-self-start or the badge stretches to fill its grid cell —
-              grid items default to stretch, which is why the coloured
-              background ran the full column width. */}
-          <StatusBadge status={u.status} className="justify-self-start" />
-          <span className="tnum text-[11px] text-togo-muted">{u.hours}</span>
-          <span />
-        </Link>
-      ))}
+      <div className={`${TEN_ROWS} overflow-y-auto`}>
+        {paged.map((u) => (
+          <Link
+            key={u.id}
+            href="/tracker"
+            className={`${GRID} items-center border-t border-togo-border px-4 py-2 transition-colors hover:bg-[var(--togo-hover)]`}
+          >
+            <Avatar
+              name={u.authorName || "?"}
+              avatarUrl={u.authorAvatarUrl}
+              size="sm"
+              title={u.authorName || undefined}
+              className="!h-6 !w-6 !text-[10px]"
+            />
+            <span className="truncate text-xs font-medium text-togo-white">{u.project}</span>
+            <span className="truncate text-xs text-togo-muted">
+              {u.update || <span className="text-togo-faint">—</span>}
+            </span>
+            {/* justify-self-start or the badge stretches to fill its grid cell —
+                grid items default to stretch, which is why the coloured
+                background ran the full column width. */}
+            <StatusBadge status={u.status} className="justify-self-start" />
+            <span className="tnum text-[11px] text-togo-muted">{u.hours}</span>
+            <span />
+          </Link>
+        ))}
+      </div>
 
       <Pagination
         page={page}

@@ -217,6 +217,7 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
             projectName={projectName}
             initialOverview={projectSettings?.overview ?? ""}
             initialPrd={projectSettings?.prd ?? ""}
+            isProjectMember={viewerIsProjectMember}
           />
 
           {/* Metrics row: what's been spent, this week's pace, and anything stuck. */}
@@ -240,10 +241,14 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
               initialWeeklyHourCap={projectSettings?.weekly_hour_cap ?? null}
             />
 
-            <ProjectBlockers projectName={projectName} blockers={blockers} />
+            <ProjectBlockers
+              projectName={projectName}
+              blockers={blockers}
+              isProjectMember={viewerIsProjectMember}
+            />
           </div>
 
-          <ProjectTimeSection projectName={projectName} />
+          <ProjectTimeSection projectName={projectName} isProjectMember={viewerIsProjectMember} />
 
           <DeleteProjectButton projectName={projectName} />
         </div>

@@ -30,9 +30,12 @@ export interface BlockerItem {
 export function ProjectBlockers({
   projectName,
   blockers: initialBlockers,
+  isProjectMember,
 }: {
   projectName: string;
   blockers: BlockerItem[];
+  /** On this project — assigned, or has logged an update or time against it. */
+  isProjectMember: boolean;
 }) {
   const toast = useToast();
   const { currentUser } = useCurrentUser();
@@ -134,7 +137,12 @@ export function ProjectBlockers({
 
   const count = blockers.length;
   const clear = count === 0;
-  const canEdit = can(currentUser?.capabilities, "blocker.manage");
+  // Same rule as status and timeline: the capability, plus either "manage every
+  // project" or being on this one. A tier without manage.all — a plain user — is
+  // a viewer on projects they aren't part of.
+  const caps = currentUser?.capabilities;
+  const canEdit =
+    can(caps, "blocker.manage") && (can(caps, "project.manage.all") || isProjectMember);
 
   return (
     <>

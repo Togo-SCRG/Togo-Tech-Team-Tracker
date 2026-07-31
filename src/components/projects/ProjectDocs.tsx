@@ -29,10 +29,13 @@ export function ProjectDocs({
   projectName,
   initialOverview = "",
   initialPrd = "",
+  isProjectMember,
 }: {
   projectName: string;
   initialOverview?: string;
   initialPrd?: string;
+  /** On this project — assigned, or has logged an update or time against it. */
+  isProjectMember: boolean;
 }) {
   const { currentUser, loaded } = useCurrentUser();
   const [tab, setTab] = useState<Tab>("overview");
@@ -68,7 +71,12 @@ export function ProjectDocs({
   // Documenting a project is open to every signed-in member, not just admins
   // (migration 016 relaxed the matching database policies). Status and the
   // weekly cap are still admin-only and live in their own cards.
-  const canEdit = can(currentUser?.capabilities, "project.docs.edit");
+  // Same rule as status and timeline: the capability, plus either "manage every
+  // project" or being on this one. A tier without manage.all — a plain user — is
+  // a viewer on projects they aren't part of.
+  const caps = currentUser?.capabilities;
+  const canEdit =
+    can(caps, "project.docs.edit") && (can(caps, "project.manage.all") || isProjectMember);
 
   function startEditing(which: Tab) {
     setTab(which);

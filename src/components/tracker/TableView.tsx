@@ -7,6 +7,7 @@ import { SortableHeader } from "@/components/ui/SortableHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn, formatDateShort } from "@/lib/utils";
 import type { SortState } from "@/lib/useSort";
+import { TEN_ROWS_TRACKER } from "@/lib/tableHeights";
 import type { DailyUpdateItem } from "@/types";
 
 function hoursLabel(minutes: number | undefined): string {
@@ -187,7 +188,7 @@ export function TableView({
   // No border or background of its own — the tracker page wraps this in a panel
   // that supplies the frame, header and pagination footer.
   return (
-    <div className="overflow-x-auto">
+    <div className={`overflow-x-auto ${TEN_ROWS_TRACKER}`}>
       <table className="w-full min-w-[900px] text-sm">
         {/* Header stays put while long lists scroll, so you never lose track
             of which column you're reading. */}

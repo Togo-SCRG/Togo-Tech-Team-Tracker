@@ -19,9 +19,15 @@ import { usePagination } from "@/lib/usePagination";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { can } from "@/lib/capabilities";
 import { useColumns } from "@/lib/useColumns";
+import { TEN_ROWS_PY3 } from "@/lib/tableHeights";
 import type { MemberItem, TimeEntryItem } from "@/types";
 
-export function ProjectTimeSection({ projectName }: { projectName: string }) {
+export function ProjectTimeSection({ projectName,
+  isProjectMember,
+}: { projectName: string;
+  /** On this project — assigned, or has logged an update or time against it. */
+  isProjectMember: boolean;
+}) {
   const { active, elapsedSeconds, saving: stopping, start, stop } = useActiveTimer();
   const { currentUser } = useCurrentUser();
   const [members, setMembers] = useState<MemberItem[]>([]);
@@ -104,7 +110,12 @@ export function ProjectTimeSection({ projectName }: { projectName: string }) {
   } = usePagination(entries);
 
   const totalLogged = entries.reduce((sum, e) => sum + e.durationMinutes, 0);
-  const canLogWork = can(currentUser?.capabilities, "work.time.track");
+  // Same rule as status and timeline: the capability, plus either "manage every
+  // project" or being on this one. A tier without manage.all — a plain user — is
+  // a viewer on projects they aren't part of.
+  const caps = currentUser?.capabilities;
+  const canLogWork =
+    can(caps, "work.time.track") && (can(caps, "project.manage.all") || isProjectMember);
 
   return (
     <Section
@@ -179,7 +190,9 @@ export function ProjectTimeSection({ projectName }: { projectName: string }) {
           className="border-0 bg-transparent py-6"
         />
       ) : (
-        <div className="overflow-x-auto rounded-md border border-togo-border bg-togo-surface">
+        <div
+          className={`overflow-x-auto rounded-md border border-togo-border bg-togo-surface ${TEN_ROWS_PY3}`}
+        >
           <table className="w-full min-w-[600px] text-sm">
             <thead className="sticky top-0 z-10 bg-togo-surface">
               <tr className="border-b border-togo-border text-left">

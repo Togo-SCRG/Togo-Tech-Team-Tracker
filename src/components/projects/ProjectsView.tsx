@@ -34,6 +34,7 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { useColumns } from "@/lib/useColumns";
 import { can } from "@/lib/capabilities";
 import { isTimelineOverdue } from "@/lib/timeline";
+import { TEN_ROWS_PY3 } from "@/lib/tableHeights";
 import type { MemberItem } from "@/types";
 
 const STATUS_PILLS: { label: string; value: string }[] = [
@@ -687,7 +688,7 @@ export function ProjectsView({
           })}
         </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className={`overflow-x-auto ${TEN_ROWS_PY3}`}>
           <table className="w-full min-w-[640px] text-sm">
             <thead className="sticky top-0 z-10 bg-togo-surface">
               <tr className="border-b border-togo-border text-left">

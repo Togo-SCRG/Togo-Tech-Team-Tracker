@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ACCESS_LEVEL_LABELS, ACCESS_LEVEL_ORDER } from "@/lib/accessLevels";
 import { formatDateShort } from "@/lib/utils";
 import { usePagination } from "@/lib/usePagination";
+import { TEN_ROWS_PY3 } from "@/lib/tableHeights";
 import type { AccessLevel } from "@/types";
 import type { AccessMember } from "@/app/(app)/access/page";
 
@@ -113,7 +114,7 @@ export function AccessLevelsTable({
           </span>
         )}
       </div>
-      <div className="divide-y divide-togo-border">
+      <div className={`divide-y divide-togo-border ${TEN_ROWS_PY3}`}>
         {pagedMembers.map((m) => {
           const isSelf = m.id === currentUserId;
           return (
