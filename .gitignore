@@ -12,7 +12,11 @@ next-env.d.ts
 # Database migrations are applied by hand in the Supabase SQL Editor and kept
 # out of the repository. Keep a backup somewhere private: excluded from git
 # means excluded from history, so a lost working copy is a lost schema.
-supabase/
+#
+# The leading slash anchors this to the repo root. Without it the pattern also
+# matched src/lib/supabase/ - the client helpers 35 files import - which broke
+# the Vercel build with "Can't resolve '@/lib/supabase/client'".
+/supabase/
 
 # Editor / OS noise
 .vscode/
