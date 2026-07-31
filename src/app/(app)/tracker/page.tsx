@@ -285,7 +285,6 @@ export default function TrackerPage() {
     project: (u) => u.project,
     engineer: (u) => u.user.name,
     status: (u) => u.status,
-    hours: (u) => minutesByKey[`${u.userId}|${u.project}`] || 0,
     date: (u) => u.date,
     blockers: (u) => u.blockers || "",
   });
@@ -584,7 +583,6 @@ export default function TrackerPage() {
               onRowClick={openRow}
               onStatusChange={handleStatusChange}
               canEdit={canEdit}
-              minutesByKey={minutesByKey}
               onDelete={setDeleteTarget}
               sort={sort}
               onToggleSort={handleToggleSort}

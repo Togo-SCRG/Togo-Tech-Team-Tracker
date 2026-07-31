@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { BackButton } from "@/components/layout/BackButton";
 import { ProjectTimeSection } from "@/components/timetracker/ProjectTimeSection";
+import { ProjectTotalLogged } from "@/components/timetracker/ProjectTotalLogged";
 import { ProjectWeeklyCap } from "@/components/timetracker/ProjectWeeklyCap";
 import { ProjectTeamSection } from "@/components/projects/ProjectTeamSection";
 import { ProjectDocs } from "@/components/projects/ProjectDocs";
@@ -222,18 +222,7 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
 
           {/* Metrics row: what's been spent, this week's pace, and anything stuck. */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="flex flex-col rounded-md border border-togo-border bg-togo-surface p-4">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <p className="text-xs text-togo-muted">Total logged</p>
-                <Clock size={13} className="shrink-0 text-togo-faint" />
-              </div>
-              <div className="tnum text-3xl font-extrabold leading-none text-togo-white">
-                {totalMinutes > 0 ? formatMinutes(totalMinutes) : "0h"}
-              </div>
-              <p className="mt-auto pt-2 text-[10px] text-togo-muted">
-                {totalMinutes > 0 ? "Across every logged session" : "No time logged yet"}
-              </p>
-            </div>
+            <ProjectTotalLogged projectName={projectName} totalMinutes={totalMinutes} />
 
             <ProjectWeeklyCap
               projectName={projectName}

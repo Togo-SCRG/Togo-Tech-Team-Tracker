@@ -62,7 +62,7 @@ export function DateField({
         open={open}
         onClose={() => setOpen(false)}
         width={280}
-        height={400}
+        height={410}
       >
         <DatePicker
           value={value || null}

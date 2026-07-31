@@ -10,11 +10,6 @@ import type { SortState } from "@/lib/useSort";
 import { TEN_ROWS_TRACKER } from "@/lib/tableHeights";
 import type { DailyUpdateItem } from "@/types";
 
-function hoursLabel(minutes: number | undefined): string {
-  if (!minutes) return "—";
-  const h = minutes / 60;
-  return Number.isInteger(h) ? `${h}h` : `${h.toFixed(1)}h`;
-}
 
 export type TrackerSortKey =
   | "project"
@@ -22,7 +17,6 @@ export type TrackerSortKey =
   | "engineer"
   | "blockers"
   | "status"
-  | "hours"
   | "date";
 
 interface TrackerColumn {
@@ -40,7 +34,6 @@ const TRACKER_COLUMNS: TrackerColumn[] = [
   { key: "engineer", label: "Engineer", width: "w-32" },
   { key: "blockers", label: "Blockers", width: "w-48" },
   { key: "status", label: "Status", width: "w-28" },
-  { key: "hours", label: "Hrs", width: "w-16" },
   { key: "date", label: "Date", width: "w-28" },
 ];
 
@@ -122,7 +115,6 @@ export function TableView({
   onStatusChange,
   onDelete,
   canEdit,
-  minutesByKey = {},
   sort,
   onToggleSort,
   isVisible,
@@ -132,13 +124,11 @@ export function TableView({
   onStatusChange: (u: DailyUpdateItem, status: string) => void;
   onDelete: (u: DailyUpdateItem) => void;
   canEdit: (u: DailyUpdateItem) => boolean;
-  minutesByKey?: Record<string, number>;
   sort: SortState<TrackerSortKey>;
   onToggleSort: (key: TrackerSortKey) => void;
   /** From useColumns — which optional columns to render. */
   isVisible: (key: string) => boolean;
 }) {
-  const minutesFor = (u: DailyUpdateItem) => minutesByKey[`${u.userId}|${u.project}`] || 0;
 
   if (updates.length === 0) {
     return <EmptyState title="No tasks logged for this date range." />;
@@ -177,8 +167,6 @@ export function TableView({
       case "status":
         return <StatusBadge status={u.status} onClick={canEdit(u) ? (s) => onStatusChange(u, s) : undefined} />;
 
-      case "hours":
-        return <span className="tnum whitespace-nowrap text-togo-muted">{hoursLabel(minutesFor(u))}</span>;
 
       case "date":
         return <span className="tnum whitespace-nowrap text-togo-faint">{formatDateShort(u.date)}</span>;

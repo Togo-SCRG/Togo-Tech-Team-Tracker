@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PopoverPortal } from "./PopoverPortal";
 import {
   CalendarDay,
   CalendarFooter,
@@ -39,20 +40,16 @@ export function DateRangePicker({ from, to, onApply }: DateRangePickerProps) {
 
   const todayISO = useMemo(() => toISO(new Date()), []);
 
+  // Escape only. Outside-click is PopoverPortal's job now: the panel is rendered
+  // at the end of <body>, so a containerRef.contains() check here would treat
+  // clicks inside the calendar as outside clicks and close it immediately.
   useEffect(() => {
     if (!open) return;
-    function onOutsideClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    }
     function onEscape(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onOutsideClick);
     document.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("mousedown", onOutsideClick);
-      document.removeEventListener("keydown", onEscape);
-    };
+    return () => document.removeEventListener("keydown", onEscape);
   }, [open]);
 
   function openPicker() {
@@ -118,68 +115,77 @@ export function DateRangePicker({ from, to, onApply }: DateRangePickerProps) {
         Date Range
       </button>
 
-      {open && (
-        <div className="animate-fade-in absolute z-30 mt-2">
-          <CalendarPanel>
-            <CalendarHeader label="Select date range" headline={headline} />
+      {/* Portaled: this is opened from inside modals and from panels that use
+          overflow-hidden, both of which clip an absolutely-positioned calendar.
+          align="right" keeps it inside the viewport when the trigger sits near
+          the right edge, which is where it usually does. */}
+      <PopoverPortal
+        anchorRef={containerRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        width={280}
+        height={410}
+        align="right"
+      >
+        <CalendarPanel>
+          <CalendarHeader label="Select date range" headline={headline} />
 
-            <div className="px-3 pb-3 pt-2">
-              <CalendarNav
-                year={view.year}
-                month={view.month}
-                onChange={(year, month) => setView({ year, month })}
-              />
+          <div className="px-3 pb-3 pt-2">
+            <CalendarNav
+              year={view.year}
+              month={view.month}
+              onChange={(year, month) => setView({ year, month })}
+            />
 
-              <div className="grid grid-cols-7 gap-y-1">
-                <CalendarWeekdays />
-                {grid.map((date, i) =>
-                  date ? (
-                    <CalendarDay
-                      key={toISO(date)}
-                      date={date}
-                      selected={
-                        (!!start && isSameDay(date, start)) || (!!end && isSameDay(date, end))
-                      }
-                      today={toISO(date) === todayISO}
-                      inRange={
-                        !!start &&
-                        !!end &&
-                        date.getTime() > start.getTime() &&
-                        date.getTime() < end.getTime()
-                      }
-                      onClick={handleDayClick}
-                    />
-                  ) : (
-                    <div key={`blank-${i}`} />
-                  )
-                )}
-              </div>
-
-              {start && !end && (
-                <p className="mt-2 text-center text-[11px] text-togo-faint">
-                  Pick an end date, or apply for {formatPickedDate(start)} alone.
-                </p>
+            <div className="grid grid-cols-7 gap-y-1">
+              <CalendarWeekdays />
+              {grid.map((date, i) =>
+                date ? (
+                  <CalendarDay
+                    key={toISO(date)}
+                    date={date}
+                    selected={
+                      (!!start && isSameDay(date, start)) || (!!end && isSameDay(date, end))
+                    }
+                    today={toISO(date) === todayISO}
+                    inRange={
+                      !!start &&
+                      !!end &&
+                      date.getTime() > start.getTime() &&
+                      date.getTime() < end.getTime()
+                    }
+                    onClick={handleDayClick}
+                  />
+                ) : (
+                  <div key={`blank-${i}`} />
+                )
               )}
             </div>
 
-            <CalendarFooter
-              onCancel={() => setOpen(false)}
-              onConfirm={handleApply}
-              confirmLabel="Apply"
-              confirmDisabled={!start}
-              left={
-                <button
-                  type="button"
-                  onClick={handleToday}
-                  className="rounded px-2 py-1.5 text-xs font-semibold text-togo-muted transition-colors hover:text-togo-white"
-                >
-                  Today
-                </button>
-              }
-            />
-          </CalendarPanel>
-        </div>
-      )}
+            {start && !end && (
+              <p className="mt-2 text-center text-[11px] text-togo-faint">
+                Pick an end date, or apply for {formatPickedDate(start)} alone.
+              </p>
+            )}
+          </div>
+
+          <CalendarFooter
+            onCancel={() => setOpen(false)}
+            onConfirm={handleApply}
+            confirmLabel="Apply"
+            confirmDisabled={!start}
+            left={
+              <button
+                type="button"
+                onClick={handleToday}
+                className="rounded px-2 py-1.5 text-xs font-semibold text-togo-muted transition-colors hover:text-togo-white"
+              >
+                Today
+              </button>
+            }
+          />
+        </CalendarPanel>
+      </PopoverPortal>
     </div>
   );
 }
