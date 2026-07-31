@@ -1,0 +1,21 @@
+node_modules/
+.next/
+.vercel
+*.log
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Secrets - never commit. .env.local.example is the tracked template.
+.env.local
+.env*.local
+
+# Database migrations are applied by hand in the Supabase SQL Editor and kept
+# out of the repository. Keep a backup somewhere private: excluded from git
+# means excluded from history, so a lost working copy is a lost schema.
+supabase/
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

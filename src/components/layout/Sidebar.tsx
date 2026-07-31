@@ -1,0 +1,211 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  FolderKanban,
+  Users,
+  Settings,
+  ShieldCheck,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { TogoLogo } from "./TogoLogo";
+
+export interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  section: "menu" | "admin";
+}
+
+// Notifications deliberately isn't here — it's reached from the bell in the
+// topbar, which carries the unread badge. The /notifications page still exists
+// for the bell's "View all" link.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getNavItems(isAdmin: boolean, _isSuperAdmin = false, isClient = false): NavItem[] {
+  // The label follows what the page actually shows: everyone else's work as
+  // well as your own is a "Task Tracker"; only your own is "My Tasks".
+  const seesEveryone = isAdmin || isClient;
+  return [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "menu" as const },
+    {
+      href: "/tracker",
+      label: seesEveryone ? "Task Tracker" : "My Tasks",
+      icon: ClipboardList,
+      section: "menu" as const,
+    },
+    { href: "/projects", label: "Projects", icon: FolderKanban, section: "menu" as const },
+    { href: "/members", label: "Team", icon: Users, section: "menu" as const },
+    // Everyone can see who holds which tier; only the super admin can change
+    // one, which the page itself enforces.
+    { href: "/access", label: "Access Levels", icon: ShieldCheck, section: "admin" as const },
+    { href: "/settings", label: "Settings", icon: Settings, section: "admin" as const },
+  ];
+}
+
+const COLLAPSE_KEY = "togo-sidebar-collapsed";
+
+export function Sidebar({
+  isAdmin,
+  isSuperAdmin = false,
+  isClient = false,
+}: {
+  isAdmin: boolean;
+  isSuperAdmin?: boolean;
+  isClient?: boolean;
+}) {
+  const NAV_ITEMS = getNavItems(isAdmin, isSuperAdmin, isClient);
+  const pathname = usePathname();
+  const router = useRouter();
+  const [collapsed, setCollapsed] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "true");
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSE_KEY, String(next));
+      return next;
+    });
+  }
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  return (
+    <aside
+      className={cn(
+        "hidden md:flex flex-col shrink-0 bg-togo-charcoal border-r border-togo-border h-screen sticky top-0 transition-[width] duration-200",
+        collapsed ? "w-20" : "w-60"
+      )}
+    >
+      <div className="relative border-b border-togo-border px-4 py-5">
+        {!collapsed && (
+          <button
+            onClick={toggleCollapsed}
+            className="absolute right-3 top-3 rounded-md border border-togo-border bg-togo-surface p-1 text-togo-muted transition-colors hover:border-togo-blue hover:text-togo-blue"
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+            aria-expanded
+          >
+            <ChevronLeft size={16} />
+          </button>
+        )}
+
+        <div className="flex flex-col items-center gap-2">
+          <TogoLogo compact={collapsed} />
+          {!collapsed && (
+            <span className="text-xs font-bold text-togo-muted uppercase tracking-wide text-center whitespace-nowrap">
+              Togo Tech Team Tracker
+            </span>
+          )}
+        </div>
+      </div>
+
+      {collapsed && (
+        <button
+          onClick={toggleCollapsed}
+          className="mx-auto mt-3 rounded-md border border-togo-border bg-togo-surface p-1 text-togo-muted transition-colors hover:border-togo-blue hover:text-togo-blue"
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+          aria-expanded={false}
+        >
+          <ChevronRight size={16} />
+        </button>
+      )}
+
+      <nav aria-label="Main navigation" className="flex-1 px-2 py-3">
+        {(["menu", "admin"] as const).map((section) => {
+          const items = NAV_ITEMS.filter((i) => i.section === section);
+          if (items.length === 0) return null;
+          return (
+            <div key={section} className={section === "admin" ? "mt-4" : ""}>
+              {!collapsed ? (
+                <div className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-widest text-togo-faint">
+                  {section === "menu" ? "Menu" : "Admin"}
+                </div>
+              ) : (
+                // Keeps the visual gap between groups when labels are hidden.
+                section === "admin" && <div className="mx-auto mb-2 h-px w-8 bg-togo-border" />
+              )}
+              {items.map((item) => {
+                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={collapsed ? item.label : undefined}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "mb-0.5 flex items-center gap-2.5 rounded-md border-l-2 py-2 text-xs font-medium transition-colors",
+                      collapsed ? "justify-center px-0" : "px-3",
+                      active
+                        ? "border-togo-blue bg-togo-blue/10 text-togo-blue"
+                        : "border-transparent text-togo-muted hover:bg-togo-surface/40 hover:text-togo-white"
+                    )}
+                  >
+                    <Icon size={16} className="shrink-0" />
+                    {!collapsed && item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-togo-border p-2 space-y-0.5">
+        <button
+          onClick={() => setLogoutConfirmOpen(true)}
+          title={collapsed ? "Log Out" : undefined}
+          aria-label="Log out"
+          className={cn(
+            "flex w-full items-center gap-3 rounded-md py-2 text-sm font-medium text-togo-muted transition-colors hover:bg-[var(--status-blocked-bg)] hover:text-[var(--status-blocked-fg)]",
+            collapsed ? "justify-center px-0" : "px-4"
+          )}
+        >
+          <LogOut size={18} className="shrink-0" />
+          {!collapsed && "Log Out"}
+        </button>
+        {collapsed ? (
+          <div className="flex justify-center py-1">
+            <ThemeToggle />
+          </div>
+        ) : (
+          <ThemeToggle variant="row" />
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Log Out"
+        description="Are you sure you want to log out of the Togo Tech Team Tracker?"
+        confirmLabel="Log Out"
+        danger
+        loading={loggingOut}
+        onConfirm={handleLogout}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
+    </aside>
+  );
+}

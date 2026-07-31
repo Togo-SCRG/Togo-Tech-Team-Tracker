@@ -1,0 +1,143 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { notify } from "@/lib/notifications";
+
+// Distinct project names across every place a project can be named, so
+// pickers (e.g. the update/timer/project-assignment forms) can suggest
+// existing projects while still letting the user type a brand new one.
+export async function GET() {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const [{ data: dailyUpdates }, { data: timeEntries }, { data: memberProjects }, { data: projectSettings }] =
+    await Promise.all([
+      supabase.from("daily_updates").select("project"),
+      supabase.from("time_entries").select("project"),
+      supabase.from("member_projects").select("project"),
+      supabase.from("project_settings").select("project"),
+    ]);
+
+  const names = new Set<string>();
+  for (const rows of [dailyUpdates, timeEntries, memberProjects, projectSettings]) {
+    for (const row of rows || []) names.add(row.project);
+  }
+
+  const projects = Array.from(names).sort((a, b) => a.localeCompare(b));
+  return NextResponse.json({ projects });
+}
+
+// "Create a new project": sets the project's overview/PRD/timeline in
+// project_settings and creates a member_projects row for each assigned member
+// (each sees the others as co-developers). Projects aren't a real table, so
+// this is really "seed the metadata + assignments that make a project show up
+// meaningfully in the hub." Open to any signed-in member.
+export async function POST(req: NextRequest) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Open to every signed-in member (migration 026 era) — the RLS policies for
+  // project_settings and member_projects already allow it, and starting a
+  // project shouldn't need an admin any more than documenting one does.
+  const body = await req.json();
+  const { project, overview, prd, timeline, memberIds } = body as {
+    project?: string;
+    overview?: string;
+    prd?: string;
+    timeline?: string;
+    memberIds?: string[];
+  };
+
+  const name = project?.trim();
+  if (!name) {
+    return NextResponse.json({ error: "Project title is required." }, { status: 400 });
+  }
+
+  // Checked before the upsert below creates the row. This endpoint is also
+  // re-run to add assignees to an existing project, and announcing "new project"
+  // every time someone saved one would be noise.
+  const { data: priorSettings } = await supabase
+    .from("project_settings")
+    .select("project")
+    .eq("project", name)
+    .maybeSingle();
+  const isNewProject = !priorSettings;
+
+  const { error: settingsError } = await supabase
+    .from("project_settings")
+    .upsert(
+      { project: name, overview: overview || null, prd: prd || null, timeline: timeline || null },
+      { onConflict: "project" }
+    );
+
+  if (settingsError) {
+    return NextResponse.json({ error: settingsError.message }, { status: 400 });
+  }
+
+  const assignees = Array.from(new Set(memberIds || []));
+  const notifiedAsAssignee = new Set<string>();
+
+  if (assignees.length > 0) {
+    const rows = assignees.map((memberId) => ({
+      user_id: memberId,
+      project: name,
+      status: "Not Started",
+      role: "",
+      partner_ids: assignees.filter((id) => id !== memberId),
+    }));
+
+    // ignoreDuplicates: true so re-running this for an existing project
+    // (e.g. assigning more people later) only inserts the missing
+    // assignees, instead of resetting an already-set role/status back to
+    // the defaults for people already on the project.
+    //
+    // The select() matters for notifications: ON CONFLICT DO NOTHING only
+    // returns rows it actually inserted, so this is exactly the set of people
+    // newly added. Notifying `assignees` instead would re-notify everyone
+    // already on the project every time it's saved.
+    const { data: inserted, error: assignError } = await supabase
+      .from("member_projects")
+      .upsert(rows, { onConflict: "user_id,project", ignoreDuplicates: true })
+      .select("user_id");
+
+    if (assignError) {
+      return NextResponse.json({ error: assignError.message }, { status: 400 });
+    }
+
+    const newlyAssigned = (inserted || []).map((r) => r.user_id as string);
+    newlyAssigned.forEach((id) => notifiedAsAssignee.add(id));
+
+    await notify(supabase, {
+      userIds: newlyAssigned,
+      actorId: user.id,
+      type: "project_assigned",
+      project: name,
+    });
+  }
+
+  // A brand-new project is announced to the whole team. Anyone already told
+  // they were assigned is skipped — "you're on this" is the more useful of the
+  // two messages, and nobody should get both. notify() drops the creator.
+  if (isNewProject) {
+    const { data: everyone } = await supabase.from("profiles").select("id");
+    await notify(supabase, {
+      userIds: (everyone || []).map((p) => p.id as string).filter((id) => !notifiedAsAssignee.has(id)),
+      actorId: user.id,
+      type: "project_created",
+      project: name,
+    });
+  }
+
+  return NextResponse.json({ ok: true, project: name });
+}
