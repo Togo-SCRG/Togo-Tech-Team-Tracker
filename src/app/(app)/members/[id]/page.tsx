@@ -22,6 +22,7 @@ import { can } from "@/lib/capabilities";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { EditProfileModal } from "@/components/members/EditProfileModal";
 import { MemberProjectModal } from "@/components/members/MemberProjectModal";
 import { BackButton } from "@/components/layout/BackButton";
@@ -31,6 +32,7 @@ import type { CurrentUser, MemberItem, MemberProjectItem } from "@/types";
 export default function MemberProfilePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const toast = useToast();
   const [member, setMember] = useState<MemberItem | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [allMembers, setAllMembers] = useState<MemberItem[]>([]);
@@ -140,10 +142,14 @@ export default function MemberProfilePage() {
   async function handleDeleteMember() {
     setDeletingMember(true);
     setDeleteError(null);
+    const deletedName = member!.name;
     const res = await fetch(`/api/members/${member!.id}`, { method: "DELETE" });
     if (res.ok) {
       router.push("/members");
       router.refresh();
+      // Fired before navigating away: the toast lives at the app layout level,
+      // so it survives the route change and lands on the team list.
+      toast.success(`${deletedName}'s account was deleted.`);
     } else {
       const data = await res.json();
       setDeleteError(data.error || "Failed to delete member.");
@@ -158,7 +164,15 @@ export default function MemberProfilePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: nextStatus }),
     });
-    if (!res.ok) load();
+    // The badge was already flipped optimistically above, so without this a
+    // rejected change just silently snapped back on the next load().
+    if (res.ok) {
+      toast.success(`${p.project} is now ${nextStatus}.`);
+    } else {
+      load();
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || `Couldn't update the status for ${p.project}.`);
+    }
   }
 
   return (

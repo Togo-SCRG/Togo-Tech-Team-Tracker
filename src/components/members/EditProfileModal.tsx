@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input, Textarea, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { AvatarUploadField } from "@/components/members/AvatarUploadField";
+import { useToast } from "@/components/ui/Toast";
 import type { MemberItem } from "@/types";
 
 export function EditProfileModal({
@@ -18,6 +19,7 @@ export function EditProfileModal({
   onSaved: () => void;
   member: MemberItem;
 }) {
+  const toast = useToast();
   const [role, setRole] = useState(member.role);
   const [bio, setBio] = useState(member.bio || "");
   const [skills, setSkills] = useState(member.skills || "");
@@ -75,6 +77,9 @@ export function EditProfileModal({
     onSaved();
     onClose();
     setSaving(false);
+    // A changed sign-in address is worth calling out separately — it's the one
+    // edit here that affects how this person logs in.
+    toast.success(emailChanged ? "Profile saved — sign-in email updated." : "Profile saved.");
   }
 
   return (
