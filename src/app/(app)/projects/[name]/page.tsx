@@ -7,6 +7,7 @@ import { ProjectWeeklyCap } from "@/components/timetracker/ProjectWeeklyCap";
 import { ProjectTeamSection } from "@/components/projects/ProjectTeamSection";
 import { ProjectDocs } from "@/components/projects/ProjectDocs";
 import { ProjectStatusBadge } from "@/components/projects/ProjectStatusBadge";
+import { ProjectNameField } from "@/components/projects/ProjectNameField";
 import { ProjectTimelineField } from "@/components/projects/ProjectTimelineField";
 import { ProjectBlockers } from "@/components/projects/ProjectBlockers";
 import { ProjectActivityFeed, type ActivityEvent } from "@/components/projects/ProjectActivityFeed";
@@ -183,10 +184,7 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
         <div className="space-y-4">
           <header className="rounded-md border border-togo-border bg-togo-surface p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <h1 className="text-xl font-extrabold text-togo-white">
-                <span className="text-togo-muted">Project: </span>
-                {projectName}
-              </h1>
+              <ProjectNameField projectName={projectName} isProjectMember={viewerIsProjectMember} />
               <ProjectStatusBadge
                 projectName={projectName}
                 initialStatus={projectStatus}

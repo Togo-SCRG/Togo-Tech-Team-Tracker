@@ -11,13 +11,18 @@ import {
   CheckCheck,
   CheckSquare,
   Inbox,
+  Minus,
+  Search,
   SlidersHorizontal,
   Square,
   Trash2,
+  X,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { cn, formatDateShort, timeAgo } from "@/lib/utils";
@@ -47,6 +52,46 @@ const TYPE_FILTERS: { key: TypeFilter; label: string }[] = [
   { key: "project_created", label: "New projects" },
 ];
 
+/**
+ * Tri-state checkbox. A real <input type="checkbox"> can only be made
+ * indeterminate imperatively via a ref, and it can't be themed to match the
+ * rest of the hub, so this is a button carrying the checkbox role.
+ */
+function SelectBox({
+  checked,
+  indeterminate = false,
+  onToggle,
+  label,
+  disabled = false,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onToggle: () => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  const on = checked || indeterminate;
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onToggle}
+      className={cn(
+        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors disabled:opacity-50",
+        on
+          ? "border-togo-blue bg-togo-blue text-white"
+          : "border-togo-border-strong bg-togo-surface-2 text-transparent hover:border-togo-blue"
+      )}
+    >
+      {indeterminate ? <Minus size={11} /> : checked ? <Check size={11} /> : null}
+    </button>
+  );
+}
+
 export default function NotificationsPage() {
   const toast = useToast();
   const [tab, setTab] = useState<NotificationFilter>("all");
@@ -59,6 +104,10 @@ export default function NotificationsPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Close the filter menu on outside click and Escape.
   useEffect(() => {
@@ -82,13 +131,30 @@ export default function NotificationsPage() {
     setItems(data.notifications);
     setUnread(data.unreadCount);
     setArchivedCount(data.archivedCount);
+    // Drop any selected id that's no longer in the list — deleted, or archived
+    // out of this tab. Without this a stale selection could act on rows that
+    // aren't on screen, and the "N selected" count would disagree with the
+    // ticked boxes.
+    setSelected((prev) => {
+      if (prev.size === 0) return prev;
+      const present = new Set(data.notifications.map((n) => n.id));
+      const next = new Set([...prev].filter((id) => present.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
     setLoading(false);
   }, []);
 
   useEffect(() => {
     setLoading(true);
+    setSelected(new Set());
     load(tab);
   }, [tab, load]);
+
+  // Narrowing the type filter or the search hides rows, and acting on a hidden
+  // row is never what the button in front of you appears to promise.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [typeFilter, query]);
 
   // Being on this page counts as having looked, however you got here — a
   // bookmark, a refresh, or a link from a notification. Runs once on mount
@@ -156,8 +222,84 @@ export default function NotificationsPage() {
   }
 
   const now = new Date();
-  const visible = typeFilter === "all" ? items : items.filter((n) => n.type === typeFilter);
+  const term = query.trim().toLowerCase();
+
+  // Both filters are client-side, which is honest here: the list the server
+  // returns is capped at 50, so there's nothing off-screen for a query to miss.
+  const visible = items.filter((n) => {
+    if (typeFilter !== "all" && n.type !== typeFilter) return false;
+    if (!term) return true;
+    // The project, who did it, and the role you were given — the three strings
+    // a person actually remembers a notification by.
+    return [n.project, n.actorName, n.role].some((field) => field?.toLowerCase().includes(term));
+  });
   const filteredOut = items.length - visible.length;
+
+  // Selection is scoped to what's on screen, so "select all" never reaches past
+  // the current tab, type filter and search.
+  const selectedCount = selected.size;
+  const allVisibleSelected = visible.length > 0 && visible.every((n) => selected.has(n.id));
+  const someVisibleSelected = selectedCount > 0 && !allVisibleSelected;
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelected((prev) => (prev.size > 0 ? new Set() : new Set(visible.map((n) => n.id))));
+  }
+
+  async function bulkAct(body: { read?: boolean; archived?: boolean }, describe: (n: number) => string) {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+
+    setBulkBusy(true);
+    const res = await fetch("/api/notifications/bulk", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, ...body }),
+    });
+
+    if (res.ok) {
+      setSelected(new Set());
+      toast.success(describe(ids.length));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "That didn't work. Please try again.");
+    }
+    // Reloading rather than patching in place: these actions move rows between
+    // tabs, and the counts have to come from the server anyway.
+    await load(tab);
+    setBulkBusy(false);
+  }
+
+  async function bulkDelete() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+
+    setBulkBusy(true);
+    const res = await fetch("/api/notifications/bulk", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+
+    if (res.ok) {
+      setSelected(new Set());
+      toast.success(`${ids.length} ${ids.length === 1 ? "notification" : "notifications"} deleted.`);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Couldn't delete those. Please try again.");
+    }
+    setConfirmDeleteOpen(false);
+    await load(tab);
+    setBulkBusy(false);
+  }
 
   return (
     <div className="space-y-4">
@@ -265,54 +407,201 @@ export default function NotificationsPage() {
           <Skeleton className="h-16 rounded-md" />
           <Skeleton className="h-16 rounded-md" />
         </div>
-      ) : visible.length === 0 ? (
-        // Distinguishes "the tab is empty" from "your type filter hid
-        // everything" — the fix for each is different.
-        filteredOut > 0 ? (
-          <EmptyState
-            icon={SlidersHorizontal}
-            title="Nothing of that type here"
-            description={`${filteredOut} ${filteredOut === 1 ? "notification is" : "notifications are"} hidden by the type filter.`}
-            action={
-              <Button size="sm" variant="secondary" onClick={() => setTypeFilter("all")}>
-                Show all activity
-              </Button>
-            }
-          />
-        ) : (
-          <EmptyState
-            icon={tab === "archived" ? Archive : tab === "unread" ? BellOff : Bell}
-            title={
-              tab === "archived"
-                ? "Nothing archived"
-                : tab === "unread"
-                ? "You're all caught up"
-                : "No notifications yet"
-            }
-            description={
-              tab === "archived"
-                ? "Notifications you archive are kept here rather than deleted."
-                : tab === "unread"
-                ? "Every notification has been read."
-                : "New projects, and being added to or taken off one, all show up here."
-            }
-          />
-        )
       ) : (
-        <ul className="overflow-hidden rounded-md border border-togo-border bg-togo-surface">
+        <>
+          {/* Rendered whenever the tab has any rows at all — not just when the
+              filters match something. A search that hides everything would
+              otherwise take its own input off screen, leaving no way to clear
+              the query except reloading the page. */}
+          {items.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-togo-border bg-togo-surface px-3 py-2">
+            <SelectBox
+              checked={allVisibleSelected}
+              indeterminate={someVisibleSelected}
+              onToggle={toggleAllVisible}
+              disabled={bulkBusy || visible.length === 0}
+              label={selectedCount > 0 ? "Clear selection" : `Select all ${visible.length}`}
+            />
+
+            {selectedCount > 0 ? (
+              <span className="tnum text-xs font-semibold text-togo-white">
+                {selectedCount} selected
+              </span>
+            ) : (
+              <span className="text-xs text-togo-faint">
+                Select notifications to act on several at once
+              </span>
+            )}
+
+            {/* Actions and search share the right-hand side: the search box
+                stays put as selection comes and goes, so it never jumps
+                sideways under the cursor mid-type. */}
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              {selectedCount > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={bulkBusy}
+                    onClick={() =>
+                      bulkAct({ read: true }, (n) => `${n} marked as read.`)
+                    }
+                  >
+                    <CheckCheck size={13} /> Read
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={bulkBusy}
+                    onClick={() =>
+                      bulkAct({ read: false }, (n) => `${n} marked as unread.`)
+                    }
+                  >
+                    <Square size={13} /> Unread
+                  </Button>
+                  {/* The All and Unread tabs never contain archived rows (the
+                      query excludes them), so the action is unambiguous per tab
+                      rather than a per-row toggle. */}
+                  {tab === "archived" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={bulkBusy}
+                      onClick={() =>
+                        bulkAct({ archived: false }, (n) => `${n} moved back to your inbox.`)
+                      }
+                    >
+                      <ArchiveRestore size={13} /> Move to inbox
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={bulkBusy}
+                      onClick={() => bulkAct({ archived: true }, (n) => `${n} archived.`)}
+                    >
+                      <Archive size={13} /> Archive
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={bulkBusy}
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    className="border-[var(--status-blocked-fg)] text-[var(--status-blocked-fg)] hover:bg-[var(--status-blocked-bg)]"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </Button>
+                </>
+              )}
+
+              <div className="relative">
+                <Search
+                  size={13}
+                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-togo-faint"
+                />
+                <Input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setQuery("");
+                  }}
+                  placeholder="Search project or person"
+                  aria-label="Search notifications"
+                  className="h-8 w-full py-1 pl-8 pr-7 text-xs sm:w-56"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    title="Clear search"
+                    aria-label="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded text-togo-faint transition-colors hover:text-togo-white"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          )}
+
+          {visible.length === 0 ? (
+            // Three different reasons the list can be empty, each with a
+            // different fix: a query that matched nothing, a type filter hiding
+            // everything, or genuinely nothing in this tab.
+            term ? (
+              <EmptyState
+                icon={Search}
+                title="No matches"
+                description={`Nothing in ${
+                  tab === "archived" ? "your archive" : tab === "unread" ? "your unread" : "this list"
+                } matches “${query.trim()}”.`}
+                action={
+                  <Button size="sm" variant="secondary" onClick={() => setQuery("")}>
+                    Clear search
+                  </Button>
+                }
+              />
+            ) : filteredOut > 0 ? (
+              <EmptyState
+                icon={SlidersHorizontal}
+                title="Nothing of that type here"
+                description={`${filteredOut} ${
+                  filteredOut === 1 ? "notification is" : "notifications are"
+                } hidden by the type filter.`}
+                action={
+                  <Button size="sm" variant="secondary" onClick={() => setTypeFilter("all")}>
+                    Show all activity
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={tab === "archived" ? Archive : tab === "unread" ? BellOff : Bell}
+                title={
+                  tab === "archived"
+                    ? "Nothing archived"
+                    : tab === "unread"
+                    ? "You're all caught up"
+                    : "No notifications yet"
+                }
+                description={
+                  tab === "archived"
+                    ? "Notifications you archive are kept here rather than deleted."
+                    : tab === "unread"
+                    ? "Every notification has been read."
+                    : "New projects, and being added to or taken off one, all show up here."
+                }
+              />
+            )
+          ) : (
+          <ul className="mt-2 overflow-hidden rounded-md border border-togo-border bg-togo-surface">
           {visible.map((n) => {
             const { verb, icon: TypeIcon, badgeClass, systemGenerated } = notificationVisual(n.type);
             const isBusy = busyId === n.id;
             const isArchived = !!n.archivedAt;
+            const isSelected = selected.has(n.id);
             return (
               <li
                 key={n.id}
                 className={cn(
                   "group flex items-center gap-2 border-b border-togo-border px-3 py-3 transition-colors last:border-b-0 hover:bg-[var(--togo-hover)]",
                   !n.readAt && "bg-[var(--status-blocked-fg)]/[0.04]",
+                  // Selection wins over the unread tint so a ticked row reads as
+                  // ticked regardless of its read state.
+                  isSelected && "bg-togo-blue/[0.08]",
                   isBusy && "opacity-50"
                 )}
               >
+                {/* Outside the Link below, or ticking a box would navigate. */}
+                <SelectBox
+                  checked={isSelected}
+                  onToggle={() => toggleOne(n.id)}
+                  disabled={bulkBusy}
+                  label={`Select this notification about ${n.project}`}
+                />
                 {/* The whole body is the click target — a single project name is
                     a small thing to hit. The action buttons sit outside this
                     link so they don't navigate. */}
@@ -398,8 +687,23 @@ export default function NotificationsPage() {
               </li>
             );
           })}
-        </ul>
+          </ul>
+          )}
+        </>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title={`Delete ${selectedCount} ${selectedCount === 1 ? "notification" : "notifications"}`}
+        description={`This permanently removes ${
+          selectedCount === 1 ? "it" : "them"
+        } — deleting isn't the same as archiving, and there's no undo. Archive instead if you just want them out of your inbox.`}
+        confirmLabel={`Delete ${selectedCount}`}
+        danger
+        loading={bulkBusy}
+        onConfirm={bulkDelete}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
     </div>
   );
 }

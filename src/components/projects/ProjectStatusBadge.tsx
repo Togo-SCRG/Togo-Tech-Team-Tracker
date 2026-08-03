@@ -72,7 +72,11 @@ export function ProjectStatusBadge({
     });
     setSaving(false);
 
-    if (!res.ok) {
+    if (res.ok) {
+      // The badge already changed optimistically, so this is the only signal
+      // that the change actually reached the database rather than just the UI.
+      toast.success(`Status changed to ${next}.`);
+    } else {
       // Reverting silently made a failed click look like it never registered.
       setStatus(prev);
       const data = await res.json().catch(() => ({}));

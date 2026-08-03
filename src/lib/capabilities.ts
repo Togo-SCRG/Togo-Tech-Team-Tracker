@@ -13,6 +13,7 @@ export type Capability =
   | "project.delete"
   | "project.docs.edit"
   | "project.hourcap.edit"
+  | "project.name.edit"
   | "project.status.edit"
   | "project.timeline.edit"
   | "project.manage.all"
@@ -61,6 +62,12 @@ export const CAPABILITIES: CapabilityInfo[] = [
     hint: "The budget a project's pace is measured against",
   },
   {
+    key: "project.name.edit",
+    group: "Projects",
+    label: "Rename a project",
+    hint: "Limited to projects they're on, unless they can manage every project",
+  },
+  {
     key: "project.status.edit",
     group: "Projects",
     label: "Change project status",
@@ -76,7 +83,7 @@ export const CAPABILITIES: CapabilityInfo[] = [
     key: "project.manage.all",
     group: "Projects",
     label: "Manage every project",
-    hint: "Lifts the 'must be on this project' limit from status and timeline",
+    hint: "Lifts the 'must be on this project' limit from name, status, timeline and docs",
   },
   {
     key: "project.assign",

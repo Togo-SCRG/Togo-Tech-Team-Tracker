@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { AddProjectMemberModal } from "@/components/projects/AddProjectMemberModal";
+import { useToast } from "@/components/ui/Toast";
 import { formatMinutes } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { can } from "@/lib/capabilities";
@@ -37,6 +38,7 @@ export function ProjectTeamSection({
   projectName: string;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const { currentUser } = useCurrentUser();
   const canAssign = can(currentUser?.capabilities, "project.assign");
   const canUnassign = can(currentUser?.capabilities, "project.unassign");
@@ -55,10 +57,12 @@ export function ProjectTeamSection({
     if (!removeTarget?.memberProjectId) return;
     setRemoving(true);
     setError(null);
+    const removedName = removeTarget.name;
     const res = await fetch(`/api/member-projects/${removeTarget.memberProjectId}`, { method: "DELETE" });
     if (res.ok) {
       setRemoveTarget(null);
       router.refresh();
+      toast.success(`${removedName} removed from this project.`);
     } else {
       const data = await res.json();
       setError(data.error || "Failed to remove this member from the project.");
@@ -73,7 +77,15 @@ export function ProjectTeamSection({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    if (res.ok) router.refresh();
+    // Previously this reported nothing either way: a rejected status change
+    // just left the old badge on screen, indistinguishable from a missed click.
+    if (res.ok) {
+      router.refresh();
+      toast.success(`${p.name} is now ${status} on this project.`);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || `Couldn't update ${p.name}'s status.`);
+    }
   }
 
   return (

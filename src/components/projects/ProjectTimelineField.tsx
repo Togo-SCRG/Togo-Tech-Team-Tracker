@@ -67,9 +67,13 @@ export function ProjectTimelineField({
     setSaving(false);
 
     if (res.ok) {
+      const had = !!timeline;
       setTimeline(value);
       setEditing(false);
       setPickerOpen(false);
+      // Clearing the field is a distinct outcome from setting one, and the
+      // result ("Not set") looks the same as a failed save without this.
+      toast.success(value ? `Timeline ${had ? "updated" : "set"}.` : "Timeline cleared.");
     } else {
       const data = await res.json().catch(() => ({}));
       toast.error(data.error || "Couldn't save the timeline. Please try again.");

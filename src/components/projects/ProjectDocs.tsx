@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PrdField } from "@/components/projects/PrdField";
 import { PrdPreviewModal } from "@/components/projects/PrdPreviewModal";
+import { useToast } from "@/components/ui/Toast";
 import { cn, formatBytes, formatDateLong } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { can } from "@/lib/capabilities";
@@ -38,6 +39,7 @@ export function ProjectDocs({
   isProjectMember: boolean;
 }) {
   const { currentUser, loaded } = useCurrentUser();
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("overview");
 
   // Seeded from the server render so the text is there on first paint.
@@ -103,9 +105,15 @@ export function ProjectDocs({
       body: JSON.stringify(body),
     });
     if (res.ok) {
+      // "Added" vs "updated" is read off what was there before the save — the
+      // form looks identical either way, so the toast is the only thing that
+      // tells you which one just happened.
+      const label = tab === "overview" ? "Overview" : "PRD";
+      const hadContent = tab === "overview" ? !!overview : !!prd;
       if (tab === "overview") setOverview(draftOverview);
       else setPrd(draftPrd);
       setEditing(false);
+      toast.success(`${label} ${hadContent ? "updated" : "added"}.`);
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to save. Please try again.");
@@ -123,6 +131,7 @@ export function ProjectDocs({
     if (res.ok) {
       loadFile();
       setEditing(false);
+      toast.success(`“${file.name}” uploaded.`);
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to upload file.");
@@ -133,10 +142,13 @@ export function ProjectDocs({
   async function handleRemoveFile() {
     setUploading(true);
     setError(null);
+    // Captured before the state clears below, so the toast can still name it.
+    const removedName = prdFile?.name;
     const res = await fetch(`/api/project-files?project=${encodeURIComponent(projectName)}`, { method: "DELETE" });
     if (res.ok) {
       setPrdFile(null);
       setRemoveConfirmOpen(false);
+      toast.success(removedName ? `“${removedName}” removed.` : "PRD file removed.");
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to remove the file.");
