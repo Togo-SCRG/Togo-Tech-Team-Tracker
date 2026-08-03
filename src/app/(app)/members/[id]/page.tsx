@@ -326,7 +326,7 @@ export default function MemberProfilePage() {
               }
               action={
                 isOwnProfile ? (
-                  <Link href="/tracker?logUpdate=1">
+                  <Link href="/daily-updates?logUpdate=1">
                     <Button size="sm">Log an update</Button>
                   </Link>
                 ) : undefined

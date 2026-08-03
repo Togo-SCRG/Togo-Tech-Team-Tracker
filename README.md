@@ -1,4 +1,4 @@
-# Togo Tech Team Tracker
+# Togo Tech Hub
 
 An internal productivity tracker for the Togo tech team: daily updates, time tracking, project
 oversight, and a permission system the super admin manages from the UI.
@@ -58,9 +58,9 @@ from the UI (see [Permissions](#permissions)).
 | Tier | By default |
 |---|---|
 | **Super admin** | Everything, including permissions and access levels. Never restricted. |
-| **Admin** | Manage any project and its hour cap. Own updates only. Create and delete projects. Sees every member's tasks. |
+| **Admin** | Manage any project and its hour cap. Own updates only. Create and delete projects. Sees every member's updates. |
 | **Client** | A stakeholder. Watches every project and can set status, timeline, overview and cap. Creates projects and other client accounts. Cannot log updates or track time. |
-| **User** | Logs their own updates and time. Creates projects but can't delete them. Sets status and timeline on projects they're on. Sees only their own tasks. |
+| **User** | Logs their own updates and time. Creates projects but can't delete them. Sets status and timeline on projects they're on. Sees only their own updates. |
 
 ## Features
 
@@ -75,12 +75,12 @@ from the UI (see [Permissions](#permissions)).
 - **Active projects** — most recently active first, with a status-derived progress bar.
 - A plain user's dashboard is scoped to their own updates, matching the tracker.
 
-### Task Tracker (`/tracker`)
+### Daily Updates (`/daily-updates`)
 
 Table and card views of daily updates, with status pills, an engineer filter, date presets and a custom
 range, search, column visibility, sorting, pagination, and Excel export.
 
-- **All tasks / My tasks** tabs for admins and the super admin. Other tiers see the toolbar unchanged.
+- **All updates / My updates** tabs for admins and the super admin. Other tiers see the toolbar unchanged.
 - **Log update** always records your own work; **Log member update** appears only for someone permitted
   to log on another person's behalf.
 - The status field is the *project's* status — read from the project when you pick one, and writing it

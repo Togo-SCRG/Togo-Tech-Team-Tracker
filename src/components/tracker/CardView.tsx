@@ -19,7 +19,7 @@ export function CardView({
   canEdit: (u: DailyUpdateItem) => boolean;
 }) {
   if (updates.length === 0) {
-    return <EmptyState title="No tasks logged for this date range." />;
+    return <EmptyState title="No updates logged for this date range." />;
   }
 
   const grouped = updates.reduce<Record<string, DailyUpdateItem[]>>((acc, u) => {

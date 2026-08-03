@@ -12,7 +12,7 @@ import type { CurrentUser } from "@/types";
 
 const PAGE_TITLES: { match: (p: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith("/dashboard"), title: "Dashboard" },
-  { match: (p) => p.startsWith("/tracker"), title: "Task Tracker" },
+  { match: (p) => p.startsWith("/daily-updates"), title: "Daily Updates" },
   { match: (p) => p.startsWith("/projects"), title: "Projects" },
   { match: (p) => p.startsWith("/members"), title: "Team" },
   { match: (p) => p.startsWith("/notifications"), title: "Notifications" },

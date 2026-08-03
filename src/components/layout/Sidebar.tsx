@@ -33,17 +33,12 @@ export interface NavItem {
 // for the bell's "View all" link.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getNavItems(isAdmin: boolean, _isSuperAdmin = false, isClient = false): NavItem[] {
-  // The label follows what the page actually shows: everyone else's work as
-  // well as your own is a "Task Tracker"; only your own is "My Tasks".
-  const seesEveryone = isAdmin || isClient;
   return [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "menu" as const },
-    {
-      href: "/tracker",
-      label: seesEveryone ? "Task Tracker" : "My Tasks",
-      icon: ClipboardList,
-      section: "menu" as const,
-    },
+    // One label for everyone. What differs by tier is whose updates you see,
+    // and the All / My tabs on the page itself say that far more clearly than
+    // two different nav labels did.
+    { href: "/daily-updates", label: "Daily Updates", icon: ClipboardList, section: "menu" as const },
     { href: "/projects", label: "Projects", icon: FolderKanban, section: "menu" as const },
     { href: "/members", label: "Team", icon: Users, section: "menu" as const },
     // Everyone can see who holds which tier; only the super admin can change
@@ -115,7 +110,7 @@ export function Sidebar({
           <TogoLogo compact={collapsed} />
           {!collapsed && (
             <span className="text-xs font-bold text-togo-muted uppercase tracking-wide text-center whitespace-nowrap">
-              Togo Tech Team Tracker
+              Togo Tech Hub
             </span>
           )}
         </div>
@@ -199,7 +194,7 @@ export function Sidebar({
       <ConfirmDialog
         open={logoutConfirmOpen}
         title="Log Out"
-        description="Are you sure you want to log out of the Togo Tech Team Tracker?"
+        description="Are you sure you want to log out of the Togo Tech Hub?"
         confirmLabel="Log Out"
         danger
         loading={loggingOut}

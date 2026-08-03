@@ -53,7 +53,7 @@ export default function LoginPage() {
           <div className="h-1 bg-togo-blue" />
           <div className="p-8">
             <h1 className="text-xl font-bold text-togo-white mb-1">Welcome back</h1>
-            <p className="text-sm text-togo-muted mb-6">Sign in to the Togo Tech Team Tracker.</p>
+            <p className="text-sm text-togo-muted mb-6">Sign in to the Togo Tech Hub.</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>

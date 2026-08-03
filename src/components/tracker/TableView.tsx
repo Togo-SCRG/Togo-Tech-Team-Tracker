@@ -131,7 +131,7 @@ export function TableView({
 }) {
 
   if (updates.length === 0) {
-    return <EmptyState title="No tasks logged for this date range." />;
+    return <EmptyState title="No updates logged for this date range." />;
   }
 
   const shown = TRACKER_COLUMNS.filter((c) => c.fixed || isVisible(c.key));

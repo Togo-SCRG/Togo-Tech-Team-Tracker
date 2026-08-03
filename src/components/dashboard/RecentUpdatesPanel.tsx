@@ -71,7 +71,7 @@ export function RecentUpdatesPanel({ rows }: { rows: RecentUpdateRow[] }) {
         {paged.map((u) => (
           <Link
             key={u.id}
-            href="/tracker"
+            href="/daily-updates"
             className={`${GRID} items-center border-t border-togo-border px-4 py-2 transition-colors hover:bg-[var(--togo-hover)]`}
           >
             <Avatar

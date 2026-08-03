@@ -3,7 +3,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
-  title: "Togo Tech Team Tracker",
+  title: "Togo Tech Hub",
   description: "Internal team productivity dashboard for the Togo tech team.",
   icons: {
     icon: [{ url: "/logo/togo.webp", type: "image/webp" }],

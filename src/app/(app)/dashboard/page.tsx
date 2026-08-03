@@ -349,7 +349,7 @@ export default async function DashboardPage() {
             </Button>
           </Link>
           {canLogWork && (
-            <Link href="/tracker?logUpdate=1">
+            <Link href="/daily-updates?logUpdate=1">
               <Button size="sm">
                 <Plus size={14} /> Log update
               </Button>
@@ -361,7 +361,7 @@ export default async function DashboardPage() {
       {/* Blocked work is the one thing that needs chasing — surface it up front. */}
       {blocked > 0 && (
         <Link
-          href="/tracker"
+          href="/daily-updates"
           className="flex items-start gap-2.5 rounded-md border border-[var(--status-blocked-border)] bg-[var(--status-blocked-bg)] px-4 py-3 transition-opacity hover:opacity-90"
         >
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--status-blocked-fg)]" />
@@ -398,7 +398,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between border-b border-togo-border px-4 py-2.5">
             <span className="text-xs font-medium text-togo-muted">Recent updates</span>
             <Link
-              href="/tracker"
+              href="/daily-updates"
               className="flex items-center gap-1 text-[11px] text-togo-faint transition-colors hover:text-togo-blue"
             >
               View all <ArrowRight size={11} />
@@ -412,7 +412,7 @@ export default async function DashboardPage() {
               description="Once the team starts logging daily updates, the most recent ones show up here."
               action={
                 canLogWork ? (
-                  <Link href="/tracker?logUpdate=1">
+                  <Link href="/daily-updates?logUpdate=1">
                     <Button size="sm">
                       <Plus size={14} /> Log the first update
                     </Button>

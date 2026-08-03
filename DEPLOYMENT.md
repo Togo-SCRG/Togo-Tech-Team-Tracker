@@ -1,4 +1,4 @@
-# Deploying Togo Tech Team Tracker
+# Deploying Togo Tech Hub
 
 Two things need to happen before the app works anywhere: the database must be migrated in Supabase, and
 the app must be deployed with the right environment variables.
@@ -49,7 +49,7 @@ npm run dev
    ```bash
    git init
    git add .
-   git commit -m "Togo Tech Team Tracker"
+   git commit -m "Togo Tech Hub"
    git branch -M main
    git remote add origin <your-github-repo-url>
    git push -u origin main

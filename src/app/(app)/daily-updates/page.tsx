@@ -333,7 +333,7 @@ export default function TrackerPage() {
       u.status,
       formatDateShort(u.date),
     ]);
-    await downloadExcel(`task-tracker_${dateFrom}_to_${dateTo}.xlsx`, "Task Tracker", header, rows);
+    await downloadExcel(`daily-updates_${dateFrom}_to_${dateTo}.xlsx`, "Daily Updates", header, rows);
   }
 
   if (loading || !currentUser) {
@@ -483,15 +483,15 @@ export default function TrackerPage() {
       {showScopeTabs && (
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedTabs
-            label="Task scope"
+            label="Update scope"
             value={scope}
             onChange={(v) => {
               setEngineerFilter(v === "mine" ? currentUser.id : "all");
               setPage(1);
             }}
             tabs={[
-              { label: "All tasks", value: "all", count: updates.length },
-              { label: "My tasks", value: "mine", count: myTaskCount },
+              { label: "All updates", value: "all", count: updates.length },
+              { label: "My updates", value: "mine", count: myTaskCount },
             ]}
           />
           {searchInput}

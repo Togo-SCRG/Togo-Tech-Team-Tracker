@@ -1,5 +1,5 @@
 // `xlsx` (SheetJS) is a sizeable library — imported dynamically so only
-// pages that actually export data (Task Tracker) pull it into their
+// pages that actually export data (Daily Updates) pull it into their
 // bundle, instead of it bloating every page via a shared utils import.
 export async function downloadExcel(
   filename: string,

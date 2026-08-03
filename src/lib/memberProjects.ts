@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Keeps a member's "My Projects" list in sync with what they actually log
-// in the Task Tracker — if they log an update/time entry for a project
+// in Daily Updates — if they log an update/time entry for a project
 // they don't already have a My Projects card for, create one automatically
 // (default status, no role/co-developers) instead of requiring a separate
 // manual "Add Project" step. Existing cards are left untouched so manual

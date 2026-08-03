@@ -258,7 +258,7 @@ export default function SettingsPage() {
           <Card
             icon={UserCircle}
             title="Profile"
-            description="How you appear across the tracker, on your profile page and in team lists."
+            description="How you appear across the hub, on your profile page and in team lists."
             className="flex w-full flex-col"
           >
             <AvatarUploadField memberId={user.id} name={name || user.name} avatarUrl={avatarUrl} onChange={setAvatarUrl} />
@@ -512,7 +512,7 @@ export default function SettingsPage() {
             </Card>
           </form>
 
-          <Card icon={Keyboard} title="Keyboard shortcuts" description="Move around the tracker without the mouse.">
+          <Card icon={Keyboard} title="Keyboard shortcuts" description="Move around the hub without the mouse.">
             <Button type="button" size="sm" variant="secondary" onClick={() => setShortcutsOpen(true)}>
               View shortcuts
             </Button>
@@ -528,7 +528,7 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          <Card icon={LogOut} title="Session" description="Sign out of the Togo Tech Team Tracker on this device.">
+          <Card icon={LogOut} title="Session" description="Sign out of the Togo Tech Hub on this device.">
             <Button type="button" size="sm" variant="danger" onClick={() => setLogoutConfirmOpen(true)}>
               <LogOut size={14} /> Log Out
             </Button>
@@ -541,7 +541,7 @@ export default function SettingsPage() {
       <ConfirmDialog
         open={logoutConfirmOpen}
         title="Log Out"
-        description="Are you sure you want to log out of the Togo Tech Team Tracker?"
+        description="Are you sure you want to log out of the Togo Tech Hub?"
         confirmLabel="Log Out"
         danger
         loading={loggingOut}
