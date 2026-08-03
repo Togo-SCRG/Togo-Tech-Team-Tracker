@@ -1,23 +1,16 @@
 import Link from "next/link";
-import {
-  AlertTriangle,
-  ArrowRight,
-  ClipboardList,
-  FolderKanban,
-  Plus,
-  Timer,
-} from "lucide-react";
+import { AlertTriangle, ArrowRight, ClipboardList, Plus, Timer } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { capabilitiesFor } from "@/lib/permissions";
 import type { AccessLevel } from "@/types";
-import { STATUS_OPTIONS, statusHex, statusProgress } from "@/lib/utils";
+import { STATUS_OPTIONS, statusHex } from "@/lib/utils";
 import { fetchProjectBlockers } from "@/lib/projectBlockers";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { isRealBlocker } from "@/lib/blockers";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { ProgressBar } from "@/components/ui/ProgressBar";
 import { RecentUpdatesPanel, type RecentUpdateRow } from "@/components/dashboard/RecentUpdatesPanel";
+import { ActiveProjectsPanel } from "@/components/dashboard/ActiveProjectsPanel";
 import { StatCards, type StatCard, type StatIcon, type StatItem } from "@/components/dashboard/StatCards";
 
 function hoursLabel(minutes: number): string {
@@ -98,7 +91,10 @@ export default async function DashboardPage() {
   const today = todayUpdates || [];
   const todayVisible = today.filter((u) => seesEveryone || u.user_id === ownId);
   const total = todayVisible.length;
-  // Whitespace-only text passes the SQL filter but isn't a real blocker.
+  // The SQL filter only excludes empty text; isRealBlocker also drops the
+  // placeholders people type ("N/A", "None", "Done"), which were marking
+  // projects as held up and inflating this tile.
+  //
   // Standalone project blockers are folded in and shaped to match, so everything
   // downstream — the count, the tile's list, the banner — reads one array.
   const blockers = [
@@ -109,7 +105,7 @@ export default async function DashboardPage() {
       date: b.date,
       profiles: { name: b.userName },
     })),
-    ...(openBlockers || []).filter((b) => (b.blockers as string | null)?.trim()),
+    ...(openBlockers || []).filter((b) => isRealBlocker(b.blockers as string | null)),
   ].sort((a, b) => (b.date as string).localeCompare(a.date as string));
   const blocked = blockers.length;
   const blockedProjectCount = new Set(blockers.map((b) => b.project as string)).size;
@@ -303,10 +299,11 @@ export default async function DashboardPage() {
           row into name + bar + % + badge with nothing to spare, and truncated
           the activity lines. 400px gives both room without starving the
           updates table, which keeps ~740px at max-w-6xl. */}
-      {/* No items-start: the grid stretches both columns to the same height, so
-          Active projects ends level with the updates table rather than being
-          measured in pixels against it. */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_400px]">
+      {/* items-start: each column is as tall as its own content. Without it the
+          grid stretched both to match, which padded dead space below whichever
+          panel was shorter — the two lists count different things, so they're
+          rarely the same length. */}
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[1fr_400px]">
         {/* Recent updates */}
         <div className="rounded-md border border-togo-border bg-togo-surface">
           <div className="flex items-center justify-between border-b border-togo-border px-4 py-2.5">
@@ -340,57 +337,9 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Right column */}
-        <div className="flex flex-col">
-          <div className="flex h-full flex-col overflow-hidden rounded-md border border-togo-border bg-togo-surface">
-            <div className="flex items-center justify-between border-b border-togo-border px-4 py-2.5">
-              <span className="text-xs font-medium text-togo-muted">Active projects</span>
-              <Link
-                href="/projects"
-                className="flex items-center gap-1 text-[11px] text-togo-faint transition-colors hover:text-togo-blue"
-              >
-                All <ArrowRight size={11} />
-              </Link>
-            </div>
-            {/* flex-1 + min-h-0: the list takes the rest of the column, however
-                tall the updates table beside it turns out to be, and scrolls
-                once there are more projects than fit. min-h-0 is what lets a
-                flex child shrink below its content height. */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {activeProjects.length === 0 ? (
-                <EmptyState
-                  icon={FolderKanban}
-                  title="No projects yet"
-                  description="Projects appear here as soon as work is logged against them."
-                  className="h-full justify-center border-0 bg-transparent px-4 py-8"
-                />
-              ) : (
-                activeProjects.map((p) => (
-                  <Link
-                    key={p.name}
-                    href={`/projects/${encodeURIComponent(p.name)}`}
-                    className="flex items-center gap-2 border-t border-togo-border px-4 py-2 transition-colors hover:bg-[var(--togo-hover)]"
-                  >
-                    <span className="flex-1 truncate text-xs text-togo-white" title={p.name}>
-                      {p.name}
-                    </span>
-                    <ProgressBar
-                      value={statusProgress(p.status)}
-                      color={statusHex(p.status)}
-                      label={`${p.name}: ${p.status}`}
-                      className="h-1.5 w-20 shrink-0"
-                    />
-                    <span className="tnum w-7 shrink-0 text-right text-[10px] text-togo-faint">
-                      {statusProgress(p.status)}%
-                    </span>
-                    <StatusBadge status={p.status} />
-                  </Link>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
+        {/* Right column. Both panels now page at 10 rows, so the two columns end
+            level without either being stretched to match the other. */}
+        <ActiveProjectsPanel projects={activeProjects.map((p) => ({ name: p.name, status: p.status }))} />
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import { ProjectActivityFeed, type ActivityEvent } from "@/components/projects/P
 import { DeleteProjectButton } from "@/components/projects/DeleteProjectButton";
 import { formatDateShort, formatMinutes, getWeekRange } from "@/lib/utils";
 import { fetchProjectBlockers } from "@/lib/projectBlockers";
+import { isRealBlocker } from "@/lib/blockers";
 
 export default async function ProjectDetailPage({ params }: { params: { name: string } }) {
   const projectName = decodeURIComponent(params.name);
@@ -145,7 +146,9 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
       source: b.source,
     })),
     ...(dailyUpdates || [])
-      .filter((u) => u.blockers && u.blockers.trim() !== "")
+      // isRealBlocker, not just non-empty: "N/A" and "None" are answers to the
+      // question, not things holding the project up.
+      .filter((u) => isRealBlocker(u.blockers))
       .map((u) => ({
         id: u.id as string,
         userName: u.profiles?.name || "Unknown",

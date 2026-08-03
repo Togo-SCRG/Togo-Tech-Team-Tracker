@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isRealBlocker } from "@/lib/blockers";
 
 /**
  * A blocker as the UI deals with it, from either of the two places one can live.
@@ -66,7 +67,7 @@ export async function fetchProjectBlockers(
         source: "project" as const,
       };
     })
-    // Whitespace-only text isn't a real blocker. Same guard the other read
-    // paths apply to the daily_updates column.
-    .filter((b) => b.blockers.trim() !== "");
+    // Placeholders like "N/A" or "None" aren't real blockers. Same guard every
+    // other read path applies to the daily_updates column.
+    .filter((b) => isRealBlocker(b.blockers));
 }

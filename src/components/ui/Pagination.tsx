@@ -14,6 +14,7 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
   className,
+  compact = false,
 }: {
   page: number;
   totalPages: number;
@@ -22,6 +23,12 @@ export function Pagination({
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   className?: string;
+  /**
+   * Drops the "Page: [n] of N" jump control, leaving the arrows next to the
+   * count. For a narrow column — the dashboard's 400px sidebar — where the full
+   * three-group row doesn't fit and wraps or clips.
+   */
+  compact?: boolean;
 }) {
   // Typed page number, kept separate from `page` so a half-typed value doesn't
   // navigate on every keystroke.
@@ -64,9 +71,13 @@ export function Pagination({
           lists is disorienting, and it's where you read which page you're on,
           not just how you move. A compact jump beats numbered buttons: it stays
           the same width whether there are 2 pages or 200, and typing a number
-          beats clicking through to page 40. Arrows disable at the ends. */}
+          beats clicking through to page 40. Arrows disable at the ends.
+
+          `compact` keeps the arrows and drops the jump: navigation still works
+          in a narrow column, and "1–10 of 18" on the left already says where you
+          are, so nothing is actually lost. */}
       <div className="flex items-center gap-1.5 text-xs text-togo-faint">
-        <span className="whitespace-nowrap">Page:</span>
+        {!compact && <span className="whitespace-nowrap">Page:</span>}
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
@@ -75,23 +86,27 @@ export function Pagination({
         >
           <ChevronLeft size={14} />
         </button>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ""))}
-          onBlur={commitDraft}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitDraft();
-            }
-            if (e.key === "Escape") setDraft(String(page));
-          }}
-          aria-label={`Page number, ${totalPages} total`}
-          className="tnum w-10 rounded-md border border-togo-border bg-togo-surface-2 px-1 py-1 text-center text-xs font-semibold text-togo-white outline-none focus:border-togo-blue"
-        />
-        <span className="tnum whitespace-nowrap">of {totalPages}</span>
+        {!compact && (
+          <>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ""))}
+              onBlur={commitDraft}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitDraft();
+                }
+                if (e.key === "Escape") setDraft(String(page));
+              }}
+              aria-label={`Page number, ${totalPages} total`}
+              className="tnum w-10 rounded-md border border-togo-border bg-togo-surface-2 px-1 py-1 text-center text-xs font-semibold text-togo-white outline-none focus:border-togo-blue"
+            />
+            <span className="tnum whitespace-nowrap">of {totalPages}</span>
+          </>
+        )}
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
