@@ -62,7 +62,9 @@ export function RecentUpdatesPanel({ rows }: { rows: RecentUpdateRow[] }) {
         </span>
         <span>Project</span>
         <span>Task</span>
-        <span>Status</span>
+        {/* Matches the log-update form and the tracker table: this status is the
+            project's, not the individual row's. */}
+        <span>Project status</span>
         <span>Hrs</span>
         <span />
       </div>
