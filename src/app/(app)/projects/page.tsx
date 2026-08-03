@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProjectsView } from "@/components/projects/ProjectsView";
+import { fetchProjectBlockers } from "@/lib/projectBlockers";
 
 interface Participant {
   userId: string;
@@ -11,8 +12,14 @@ interface Participant {
 export default async function ProjectsPage() {
   const supabase = createClient();
 
-  const [{ data: memberProjects }, { data: dailyUpdates }, { data: timeEntries }, { data: profiles }, { data: projectSettings }] =
-    await Promise.all([
+  const [
+    { data: memberProjects },
+    { data: dailyUpdates },
+    { data: timeEntries },
+    { data: profiles },
+    { data: projectSettings },
+    standaloneBlockers,
+  ] = await Promise.all([
       supabase.from("member_projects").select("*, profiles(id, name, avatar_url, role)"),
       supabase
         .from("daily_updates")
@@ -25,6 +32,9 @@ export default async function ProjectsPage() {
         .neq("access_level", "client")
         .order("name"),
       supabase.from("project_settings").select("project, status, timeline, weekly_hour_cap"),
+      // Blockers raised against a project directly (migration 038), so the
+      // per-project count matches what the project page shows.
+      fetchProjectBlockers(supabase),
     ]);
 
   const settingsByProject = new Map((projectSettings || []).map((p) => [p.project, p]));
@@ -50,6 +60,13 @@ export default async function ProjectsPage() {
   // via "Create Project") — make sure it still shows up in the hub.
   for (const ps of projectSettings || []) {
     getProject(ps.project);
+  }
+
+  // Standalone blockers count towards the same badge as the ones carried on a
+  // daily update below — the card shows "how much is held up", not where it was
+  // written down.
+  for (const b of standaloneBlockers) {
+    getProject(b.project).blockerCount += 1;
   }
 
   // member_projects is the source of truth for status/role when present.

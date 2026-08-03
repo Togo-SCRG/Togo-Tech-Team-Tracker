@@ -37,6 +37,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { name: st
     supabase.from("member_projects").delete().eq("project", projectName),
   ]);
   await supabase.from("project_settings").delete().eq("project", projectName);
+  // Not fatal if this table doesn't exist yet (migration 038), so it's kept out
+  // of the checked results below.
+  await supabase.from("project_blockers").delete().eq("project", projectName);
 
   const failed = [updatesResult, timeEntriesResult, memberProjectsResult].find((r) => r.error);
   if (failed?.error) {

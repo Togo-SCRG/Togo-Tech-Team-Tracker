@@ -33,7 +33,10 @@ const TRACKER_COLUMNS: TrackerColumn[] = [
   { key: "task", label: "Task", fixed: true },
   { key: "engineer", label: "Engineer", width: "w-32" },
   { key: "blockers", label: "Blockers", width: "w-48" },
-  { key: "status", label: "Status", width: "w-28" },
+  // "Project status", not "Status", matching the field in the log-update form:
+  // this value moves the whole project, not just this row. Wider than the other
+  // short columns so the two-word header doesn't wrap.
+  { key: "status", label: "Project status", width: "w-36" },
   { key: "date", label: "Date", width: "w-28" },
 ];
 

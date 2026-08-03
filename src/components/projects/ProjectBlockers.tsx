@@ -9,7 +9,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { can } from "@/lib/capabilities";
-import { cn, formatDateShort, toDateInputValue } from "@/lib/utils";
+import { cn, formatDateShort } from "@/lib/utils";
+import type { BlockerSource } from "@/lib/projectBlockers";
 
 export interface BlockerItem {
   id: string;
@@ -17,6 +18,12 @@ export interface BlockerItem {
   avatarUrl: string | null;
   blockers: string;
   date: string;
+  /**
+   * Which record this is. "project" is a row in project_blockers; "update" is
+   * the `blockers` text on a daily update someone logged. Both are shown here,
+   * but they live in different tables and so have different endpoints.
+   */
+  source: BlockerSource;
 }
 
 /**
@@ -48,14 +55,24 @@ export function ProjectBlockers({
   const [newText, setNewText] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function handleResolve(id: string) {
-    setBusyId(id);
-    const res = await fetch(`/api/updates/${id}/blocker`, { method: "DELETE" });
+  /**
+   * Both sources resolve through a DELETE, but to different endpoints: a
+   * standalone blocker gets stamped resolved, an update's blocker has its text
+   * cleared (which is all that endpoint can do without destroying the update).
+   */
+  function endpointFor(b: BlockerItem) {
+    return b.source === "project" ? `/api/project-blockers/${b.id}` : `/api/updates/${b.id}/blocker`;
+  }
+
+  async function handleResolve(b: BlockerItem) {
+    setBusyId(b.id);
+    const res = await fetch(endpointFor(b), { method: "DELETE" });
     if (res.ok) {
-      setBlockers((prev) => prev.filter((b) => b.id !== id));
+      setBlockers((prev) => prev.filter((x) => x.id !== b.id));
       toast.success("Blocker resolved.");
     } else {
-      toast.error("Failed to resolve blocker. Please try again.");
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Failed to resolve blocker. Please try again.");
     }
     setBusyId(null);
   }
@@ -65,21 +82,24 @@ export function ProjectBlockers({
     setEditText(b.blockers);
   }
 
-  async function handleSaveEdit(id: string) {
+  async function handleSaveEdit(b: BlockerItem) {
     const text = editText.trim();
     if (!text) return;
     setSaving(true);
-    const res = await fetch(`/api/updates/${id}/blocker`, {
+    const res = await fetch(endpointFor(b), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ blockers: text }),
+      // The two endpoints name the field differently: project_blockers has a
+      // `blocker` column, daily_updates a `blockers` one.
+      body: JSON.stringify(b.source === "project" ? { blocker: text } : { blockers: text }),
     });
     if (res.ok) {
-      setBlockers((prev) => prev.map((b) => (b.id === id ? { ...b, blockers: text } : b)));
+      setBlockers((prev) => prev.map((x) => (x.id === b.id ? { ...x, blockers: text } : x)));
       setEditingId(null);
       toast.success("Blocker updated.");
     } else {
-      toast.error("Failed to update blocker. Please try again.");
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Failed to update blocker. Please try again.");
     }
     setSaving(false);
   }
@@ -88,29 +108,18 @@ export function ProjectBlockers({
     const text = newText.trim();
     if (!text) return;
     setSaving(true);
-    const res = await fetch("/api/updates", {
+    // Was POST /api/updates, which logged a whole daily update (status
+    // "Blocked", no update text) just to carry the blocker — so raising one here
+    // put a phantom entry in the tracker, Daily Updates and the author's
+    // activity feed. This writes only the blocker.
+    const res = await fetch("/api/project-blockers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project: projectName,
-        date: toDateInputValue(new Date()),
-        blockers: text,
-        status: "Blocked",
-      }),
+      body: JSON.stringify({ project: projectName, blocker: text }),
     });
     if (res.ok) {
       const data = await res.json();
-      const u = data.update;
-      setBlockers((prev) => [
-        {
-          id: u.id,
-          userName: u.user?.name || "You",
-          avatarUrl: u.user?.avatarUrl ?? null,
-          blockers: u.blockers,
-          date: u.date,
-        },
-        ...prev,
-      ]);
+      setBlockers((prev) => [data.blocker as BlockerItem, ...prev]);
       setNewText("");
       setAdding(false);
       toast.success("Blocker added.");
@@ -272,7 +281,7 @@ export function ProjectBlockers({
                         autoFocus
                       />
                       <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => handleSaveEdit(b.id)} disabled={saving || !editText.trim()}>
+                        <Button size="sm" onClick={() => handleSaveEdit(b)} disabled={saving || !editText.trim()}>
                           {saving ? "Saving..." : "Save"}
                         </Button>
                         <button
@@ -305,7 +314,7 @@ export function ProjectBlockers({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleResolve(b.id)}
+                              onClick={() => handleResolve(b)}
                               disabled={busyId === b.id}
                               title="Mark as resolved"
                               aria-label="Mark as resolved"

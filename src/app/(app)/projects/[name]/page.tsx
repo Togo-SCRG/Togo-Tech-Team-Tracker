@@ -13,6 +13,7 @@ import { ProjectBlockers } from "@/components/projects/ProjectBlockers";
 import { ProjectActivityFeed, type ActivityEvent } from "@/components/projects/ProjectActivityFeed";
 import { DeleteProjectButton } from "@/components/projects/DeleteProjectButton";
 import { formatDateShort, formatMinutes, getWeekRange } from "@/lib/utils";
+import { fetchProjectBlockers } from "@/lib/projectBlockers";
 
 export default async function ProjectDetailPage({ params }: { params: { name: string } }) {
   const projectName = decodeURIComponent(params.name);
@@ -25,8 +26,13 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
   } = await supabase.auth.getUser();
   const viewerId = viewer?.id ?? null;
 
-  const [{ data: memberProjects }, { data: dailyUpdates }, { data: timeEntries }, { data: projectSettings }] =
-    await Promise.all([
+  const [
+    { data: memberProjects },
+    { data: dailyUpdates },
+    { data: timeEntries },
+    { data: projectSettings },
+    standaloneBlockers,
+  ] = await Promise.all([
       supabase
         .from("member_projects")
         .select("*, profiles(id, name, avatar_url, role)")
@@ -51,6 +57,9 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
         .select("project, status, overview, prd, timeline, weekly_hour_cap")
         .eq("project", projectName)
         .maybeSingle(),
+      // Blockers raised against the project itself, rather than carried on a
+      // daily update. Tolerates migration 038 not having been run yet.
+      fetchProjectBlockers(supabase, projectName),
     ]);
 
   // Mirror the projects-list inclusion logic: a project is "real" if it
@@ -122,15 +131,30 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
 
   const participantList = Array.from(participants.values());
 
-  const blockers = (dailyUpdates || [])
-    .filter((u) => u.blockers && u.blockers.trim() !== "")
-    .map((u) => ({
-      id: u.id,
-      userName: u.profiles?.name || "Unknown",
-      avatarUrl: u.profiles?.avatar_url ?? null,
-      blockers: u.blockers,
-      date: u.date,
-    }));
+  // Two sources, one list: blockers raised against the project directly, and
+  // blockers reported as part of somebody's daily update. They render
+  // identically — `source` is what tells the edit and resolve buttons which
+  // endpoint a given row belongs to.
+  const blockers = [
+    ...standaloneBlockers.map((b) => ({
+      id: b.id,
+      userName: b.userName,
+      avatarUrl: b.avatarUrl,
+      blockers: b.blockers,
+      date: b.date,
+      source: b.source,
+    })),
+    ...(dailyUpdates || [])
+      .filter((u) => u.blockers && u.blockers.trim() !== "")
+      .map((u) => ({
+        id: u.id as string,
+        userName: u.profiles?.name || "Unknown",
+        avatarUrl: u.profiles?.avatar_url ?? null,
+        blockers: u.blockers as string,
+        date: u.date as string,
+        source: "update" as const,
+      })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
 
   const allUpdates = dailyUpdates || [];
   const allTimeEntries = timeEntries || [];

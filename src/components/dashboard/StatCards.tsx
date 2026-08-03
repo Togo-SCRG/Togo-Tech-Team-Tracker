@@ -10,6 +10,7 @@ import {
   Circle,
   ClipboardList,
   Eye,
+  FolderKanban,
   Loader2,
   PauseCircle,
   TrendingDown,
@@ -49,6 +50,7 @@ export interface StatPeriod {
 
 export type StatIcon =
   | "updates"
+  | "projects"
   | "not-started"
   | "progress"
   | "review"
@@ -98,6 +100,7 @@ export interface StatCard {
 
 const ICONS: Record<StatIcon, LucideIcon> = {
   updates: ClipboardList,
+  projects: FolderKanban,
   "not-started": Circle,
   progress: Loader2,
   review: Eye,

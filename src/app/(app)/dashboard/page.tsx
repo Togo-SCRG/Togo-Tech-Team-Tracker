@@ -11,19 +11,14 @@ import { createClient } from "@/lib/supabase/server";
 import { capabilitiesFor } from "@/lib/permissions";
 import type { AccessLevel } from "@/types";
 import { STATUS_OPTIONS, statusHex, statusProgress } from "@/lib/utils";
+import { fetchProjectBlockers } from "@/lib/projectBlockers";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { RecentUpdatesPanel, type RecentUpdateRow } from "@/components/dashboard/RecentUpdatesPanel";
-import {
-  StatCards,
-  type StatCard,
-  type StatIcon,
-  type StatItem,
-  type StatPeriod,
-} from "@/components/dashboard/StatCards";
+import { StatCards, type StatCard, type StatIcon, type StatItem } from "@/components/dashboard/StatCards";
 
 function hoursLabel(minutes: number): string {
   if (!minutes) return "—";
@@ -34,9 +29,6 @@ export default async function DashboardPage() {
   const supabase = createClient();
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
-  const yesterday = new Date(now);
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
   const {
     data: { user: viewer },
@@ -59,24 +51,14 @@ export default async function DashboardPage() {
   const seesEveryone = viewerCaps.includes("tracker.view.all");
   const ownId = viewer?.id ?? "";
 
-  const daysAgo = (n: number) => {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() - n);
-    return d.toISOString().slice(0, 10);
-  };
-  const weekAgoStr = daysAgo(6); // today plus the six before it
-  const monthAgoStr = daysAgo(29);
-  const yearAgoStr = daysAgo(364);
-
   const [
     { data: todayUpdates },
-    { data: yesterdayUpdates },
     { data: recentUpdates },
     { data: allUpdates },
-    { data: yearUpdates },
     { data: timeEntries },
     { data: projectSettings },
     { data: openBlockers },
+    standaloneBlockers,
   ] = await Promise.all([
     // project/update/author as well as the status: the stat cards open a list of
     // what's behind each number, which a bare count can't provide.
@@ -84,17 +66,12 @@ export default async function DashboardPage() {
       .from("daily_updates")
       .select("id, status, user_id, project, update, profiles(name)")
       .eq("date", todayStr),
-    supabase.from("daily_updates").select("status").eq("date", yesterdayStr),
     supabase
       .from("daily_updates")
       .select("*, profiles(id, name, avatar_url, role)")
       .order("created_at", { ascending: false })
       .limit(50),
     supabase.from("daily_updates").select("project, status, date").order("date", { ascending: false }),
-    // Dates only, for the Updates tile's period counts. Deliberately not the
-    // full rows: a year of updates with their text would be a large payload for
-    // four numbers. The modal lists come from `recentUpdates` instead.
-    supabase.from("daily_updates").select("date, user_id").gte("date", yearAgoStr),
     supabase.from("time_entries").select("project, user_id, date, duration_minutes"),
     supabase.from("project_settings").select("project, status, weekly_hour_cap"),
     // Outstanding blockers, every project, every date — deliberately not
@@ -112,16 +89,28 @@ export default async function DashboardPage() {
       .not("blockers", "is", null)
       .neq("blockers", "")
       .order("date", { ascending: false }),
+    // Blockers raised against a project directly (migration 038). Counted in the
+    // same tile as the ones above — from the dashboard's point of view a blocker
+    // is a blocker, whichever way it was raised.
+    fetchProjectBlockers(supabase),
   ]);
 
   const today = todayUpdates || [];
-  const yest = yesterdayUpdates || [];
-  const countBy = (rows: { status: string }[], s: string) => rows.filter((u) => u.status === s).length;
-
   const todayVisible = today.filter((u) => seesEveryone || u.user_id === ownId);
   const total = todayVisible.length;
   // Whitespace-only text passes the SQL filter but isn't a real blocker.
-  const blockers = (openBlockers || []).filter((b) => (b.blockers as string | null)?.trim());
+  // Standalone project blockers are folded in and shaped to match, so everything
+  // downstream — the count, the tile's list, the banner — reads one array.
+  const blockers = [
+    ...standaloneBlockers.map((b) => ({
+      id: b.id,
+      project: b.project,
+      blockers: b.blockers,
+      date: b.date,
+      profiles: { name: b.userName },
+    })),
+    ...(openBlockers || []).filter((b) => (b.blockers as string | null)?.trim()),
+  ].sort((a, b) => (b.date as string).localeCompare(a.date as string));
   const blocked = blockers.length;
   const blockedProjectCount = new Set(blockers.map((b) => b.project as string)).size;
 
@@ -187,101 +176,26 @@ export default async function DashboardPage() {
     };
   });
 
-  /** Today's updates, shaped for the stat-card modals. */
-  const itemsFor = (predicate: (u: (typeof today)[number]) => boolean): StatItem[] =>
-    todayVisible.filter(predicate).map((u) => ({
-      id: u.id as string,
-      project: u.project as string,
-      text: (u.update as string | null) ?? null,
-      authorName: (u.profiles as { name?: string } | null)?.name || "Someone",
-      status: u.status as string,
-      date: todayStr,
-    }));
-
   // Scoped for a plain user: their dashboard shows their own updates, not the
   // team's. The rows were already fetched unfiltered for the counts above, so
   // this is a filter rather than a second query.
   const visibleRecent = (recentUpdates || []).filter((u) => seesEveryone || u.user_id === ownId);
 
-  /** Counts from the light year-long query, scoped to the viewer if needed. */
-  const countSince = (from: string) =>
-    (yearUpdates || []).filter(
-      (u) => (u.date as string) >= from && (seesEveryone || u.user_id === ownId)
-    ).length;
-
-  /**
-   * The modal's list comes from `recentUpdates` (the 50 newest), filtered to the
-   * chosen period — so the number is exact while the list is "the recent ones".
-   * The detail line says so rather than implying it's exhaustive.
-   */
-  const itemsSince = (from: string): StatItem[] =>
-    visibleRecent
-      .filter((u) => (u.date as string) >= from)
-      .map((u) => ({
-        id: u.id as string,
-        project: u.project as string,
-        text: (u.update as string | null) ?? null,
-        authorName: (u.profiles as { name?: string } | null)?.name || "Someone",
-        status: u.status as string,
-        date: u.date as string,
-      }));
-
-  const whose = seesEveryone ? "" : " you logged";
-  const periods: StatPeriod[] = [
-    {
-      key: "today",
-      short: "1D",
-      label: `Updates today`,
-      value: total,
-      delta: total - yest.length,
-      items: itemsFor(() => true),
-      detail: `Updates${whose} today, grouped by project.`,
-    },
-    {
-      key: "week",
-      short: "1W",
-      label: "Updates this week",
-      value: countSince(weekAgoStr),
-      note: "Last 7 days",
-      items: itemsSince(weekAgoStr),
-      detail: `The most recent updates${whose} in the last 7 days, grouped by project.`,
-    },
-    {
-      key: "month",
-      short: "1M",
-      label: "Updates this month",
-      value: countSince(monthAgoStr),
-      note: "Last 30 days",
-      items: itemsSince(monthAgoStr),
-      detail: `The most recent updates${whose} in the last 30 days, grouped by project.`,
-    },
-    {
-      key: "year",
-      short: "1Y",
-      label: "Updates this year",
-      value: countSince(yearAgoStr),
-      note: "Last 12 months",
-      items: itemsSince(yearAgoStr),
-      detail: `The most recent updates${whose} in the last 12 months, grouped by project.`,
-    },
-  ];
-
   const statCards: StatCard[] = [
     {
-      key: "total",
-      label: "Updates today",
-      value: total,
+      // The status tiles that follow each count one slice of this number, so it
+      // reads as their total. Openable by everyone: unlike the update list this
+      // replaced, the project list isn't scoped to the viewer.
+      key: "total-projects",
+      label: "Total projects",
+      value: activeProjects.length,
       color: "var(--togo-white)",
-      icon: "updates",
-      delta: total - yest.length,
-      items: itemsFor(() => true),
-      kind: "updates",
-      emptyLabel: "No updates logged today",
-      detail: "Every update logged today, grouped by project.",
-      periods,
-      // A plain user can't open the team's update list; the tile still shows
-      // their own count, and their work is on the tracker.
-      noDetail: !seesEveryone,
+      icon: "projects",
+      note: `${activeProjects.length} project${activeProjects.length === 1 ? "" : "s"} in the hub`,
+      items: projectItems(activeProjects),
+      kind: "projects",
+      emptyLabel: "No projects yet",
+      detail: "Every project in the hub, newest activity first.",
     },
     ...statusCards,
     {
