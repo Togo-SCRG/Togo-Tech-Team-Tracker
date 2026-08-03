@@ -55,8 +55,13 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("daily_updates")
     .select("*, profiles(id, name, avatar_url, role)")
+    // Both descending: newest day first, and within a day the most recently
+    // logged first. created_at was ascending, which sent a just-saved update to
+    // the bottom of today's rows instead of the top — every update on a given
+    // day shares the same `date`, so this tiebreak is the only thing deciding
+    // where a new one lands.
     .order("date", { ascending: false })
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (!seesEveryone) {
     query = query.eq("user_id", user.id);

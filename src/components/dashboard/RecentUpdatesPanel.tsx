@@ -29,17 +29,6 @@ export interface RecentUpdateRow {
  */
 const GRID = "grid grid-cols-[26px_minmax(0,1fr)_minmax(0,1fr)_128px_72px_26px] gap-2";
 
-/**
- * Ten rows, fixed.
- *
- * A row is the 24px avatar + 8px padding top and bottom + a 1px top border, so
- * 41px; ten of them is 410px. Fixed rather than sized to content, so the panel
- * doesn't shrink on a quiet day and the column beside it has a stable height to
- * match. The page size is 10 by default, so it fits exactly; raise it and this
- * scrolls instead of growing.
- */
-const TEN_ROWS = "h-[410px]";
-
 export function RecentUpdatesPanel({ rows }: { rows: RecentUpdateRow[] }) {
   const { page, setPage, pageSize, setPageSize, totalPages, totalItems, paged } = usePagination(rows);
 
@@ -69,7 +58,11 @@ export function RecentUpdatesPanel({ rows }: { rows: RecentUpdateRow[] }) {
         <span />
       </div>
 
-      <div className={`${TEN_ROWS} overflow-y-auto`}>
+      {/* No fixed height: the panel is as tall as the rows it's showing. It used
+          to be a fixed ten-row box so the Active projects column had a stable
+          height to match — that column now sizes itself, so all the fixed height
+          did was leave dead space below on a quiet day. */}
+      <div>
         {paged.map((u) => (
           <Link
             key={u.id}

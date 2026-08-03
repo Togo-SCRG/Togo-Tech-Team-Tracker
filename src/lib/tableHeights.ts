@@ -7,9 +7,11 @@
  * minimum keeps it still.
  *
  * `min-height`, not `height`: raising the page size to 15 or 50 should grow the
- * table, not trap it in a nested scrollbar. The one exception is the dashboard's
- * Recent updates panel, which uses a fixed height because the Active projects
- * column beside it has to match — see RecentUpdatesPanel.
+ * table, not trap it in a nested scrollbar.
+ *
+ * The dashboard's two panels deliberately use none of these: they sit side by
+ * side and are each as tall as their own content, so a minimum on either would
+ * reintroduce the dead space it was there to prevent elsewhere.
  *
  * Each value is ten times that table's own row height, which differs because the
  * rows differ: the tallest cell is usually an avatar, and the vertical padding

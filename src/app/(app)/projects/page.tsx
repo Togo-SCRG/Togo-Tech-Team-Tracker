@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProjectsView } from "@/components/projects/ProjectsView";
 import { fetchProjectBlockers } from "@/lib/projectBlockers";
+import { isRealBlocker } from "@/lib/blockers";
 
 interface Participant {
   userId: string;
@@ -89,10 +90,10 @@ export default async function ProjectsPage() {
     if (!entry.lastActivity || u.date > entry.lastActivity) {
       entry.lastActivity = u.date;
     }
-    // Unresolved blockers, matched on non-empty text — the same definition the
-    // project detail page and the dashboard use, and the same thing the Resolve
-    // button clears.
-    if (u.blockers && u.blockers.trim() !== "") entry.blockerCount += 1;
+    // Unresolved blockers — the same definition the project detail page and the
+    // dashboard use, and the same thing the Resolve button clears. Placeholders
+    // ("N/A", "None", "Done") don't count.
+    if (isRealBlocker(u.blockers)) entry.blockerCount += 1;
     if (!entry.participants.has(u.user_id) && u.profiles) {
       entry.participants.set(u.user_id, {
         userId: u.user_id,
