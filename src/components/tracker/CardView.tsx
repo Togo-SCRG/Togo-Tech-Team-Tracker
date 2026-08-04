@@ -5,6 +5,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateShort } from "@/lib/utils";
+import { isRealBlocker } from "@/lib/blockers";
 import type { DailyUpdateItem } from "@/types";
 
 export function CardView({
@@ -82,12 +83,21 @@ export function CardView({
                     </div>
                   )}
 
-                  {u.blockers && (
-                    <div className="flex items-start gap-1.5 rounded border border-[var(--status-blocked-border)] bg-[var(--status-blocked-bg)] px-2 py-1.5 text-xs text-[var(--status-blocked-fg)]">
-                      <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                      <span className="whitespace-pre-line">{u.blockers}</span>
-                    </div>
-                  )}
+                  {/* A "N/A" or "None" answer gets no red panel and no warning
+                      triangle — it says nothing is blocking, so styling it as an
+                      alert reads as the opposite. Shown as plain text so it's
+                      still clear the question was answered. */}
+                  {u.blockers &&
+                    (isRealBlocker(u.blockers) ? (
+                      <div className="flex items-start gap-1.5 rounded border border-[var(--status-blocked-border)] bg-[var(--status-blocked-bg)] px-2 py-1.5 text-xs text-[var(--status-blocked-fg)]">
+                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                        <span className="whitespace-pre-line">{u.blockers}</span>
+                      </div>
+                    ) : (
+                      <div className="border-t border-togo-border pt-2.5 text-xs text-togo-faint">
+                        <span className="whitespace-pre-line">{u.blockers}</span>
+                      </div>
+                    ))}
                 </article>
               );
             })}

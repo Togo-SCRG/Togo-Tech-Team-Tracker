@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn, formatDateShort } from "@/lib/utils";
+import { isRealBlocker } from "@/lib/blockers";
 import type { SortState } from "@/lib/useSort";
 import { TEN_ROWS_TRACKER } from "@/lib/tableHeights";
 import type { DailyUpdateItem } from "@/types";
@@ -157,13 +158,20 @@ export function TableView({
         );
 
       case "blockers":
-        return u.blockers ? (
+        if (!u.blockers) return <span className="text-togo-faint">—</span>;
+        // "N/A", "None", "Done" and friends are answers meaning *nothing* is
+        // blocking, so they're shown as plain text: red with a warning triangle
+        // read as a problem, which is the opposite of what they say. The text
+        // still shows, so it's clear the question was answered rather than
+        // skipped. Same predicate the counts use, so the column and the badges
+        // can never disagree.
+        return isRealBlocker(u.blockers) ? (
           <span className="flex items-start gap-1 text-xs text-[var(--status-blocked-fg)]">
             <AlertTriangle size={12} className="mt-0.5 shrink-0" />
             <span className="min-w-0 whitespace-pre-line">{u.blockers}</span>
           </span>
         ) : (
-          <span className="text-togo-faint">—</span>
+          <span className="min-w-0 whitespace-pre-line text-xs text-togo-muted">{u.blockers}</span>
         );
 
 
