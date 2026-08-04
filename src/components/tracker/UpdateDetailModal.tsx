@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
+import { isRealBlocker } from "@/lib/blockers";
 import type { DailyUpdateItem } from "@/types";
 
 /**
@@ -52,7 +53,9 @@ export function UpdateDetailModal({
 
         <Field label="Update">{update.update}</Field>
         <Field label="What's left to do">{update.whatsLeft}</Field>
-        <Field label="Concerns / blockers" danger>
+        {/* `danger` only when something actually is blocking — a "N/A" answer
+            tinted red reads as a problem when it says the opposite. */}
+        <Field label="Concerns / blockers" danger={isRealBlocker(update.blockers)}>
           {update.blockers}
         </Field>
 
