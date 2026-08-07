@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toDateInputValue } from "@/lib/utils";
+import { normaliseWorkType, type WorkType } from "@/lib/workType";
 
 const STORAGE_KEY = "togo-active-timer";
 const SYNC_EVENT = "togo-timer-sync";
 
 export interface ActiveTimer {
+  /** The project or task name — `workType` says which. */
   project: string;
+  workType: WorkType;
   phase: string;
   workDone: string;
   startedAt: number; // epoch ms
@@ -18,7 +21,11 @@ function readStored(): ActiveTimer | null {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    // A timer started before tasks existed has no workType — it's project work,
+    // which is what everything was. Without this it'd be undefined and the entry
+    // would be rejected on stop.
+    return { ...parsed, workType: normaliseWorkType(parsed.workType) };
   } catch {
     localStorage.removeItem(STORAGE_KEY);
     return null;
@@ -63,8 +70,8 @@ export function useActiveTimer() {
     };
   }, [active]);
 
-  function start(project: string, phase: string, workDone: string) {
-    const timer: ActiveTimer = { project, phase, workDone, startedAt: Date.now() };
+  function start(project: string, phase: string, workDone: string, workType: WorkType = "project") {
+    const timer: ActiveTimer = { project, workType, phase, workDone, startedAt: Date.now() };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(timer));
     setActive(timer);
     window.dispatchEvent(new Event(SYNC_EVENT));
@@ -82,6 +89,7 @@ export function useActiveTimer() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project: active.project,
+          workType: active.workType,
           phase: active.phase,
           date: toDateInputValue(new Date(active.startedAt)),
           durationMinutes,

@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Play, Square, Download, Timer } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowDownUp, Play, Square, Download, Timer, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { StartTimerModal } from "./StartTimerModal";
 import { TimeEntryModal } from "./TimeEntryModal";
+import { TimeImportModal } from "./TimeImportModal";
 import { PhaseBadge } from "./PhaseBadge";
 import { Pagination } from "@/components/ui/Pagination";
 import { ColumnsMenu } from "@/components/ui/ColumnsMenu";
@@ -36,6 +37,26 @@ export function ProjectTimeSection({ projectName,
   const [startModalOpen, setStartModalOpen] = useState(false);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntryItem | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [dataMenuOpen, setDataMenuOpen] = useState(false);
+  const dataMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close the export/import menu on an outside click or Escape.
+  useEffect(() => {
+    if (!dataMenuOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (dataMenuRef.current && !dataMenuRef.current.contains(e.target as Node)) setDataMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setDataMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [dataMenuOpen]);
   const { visible: columnVisibility, isVisible, toggle: toggleColumn } = useColumns("project-time");
 
   // "Name" identifies the row, so it isn't offered as hideable.
@@ -125,16 +146,84 @@ export function ProjectTimeSection({ projectName,
       action={
         <>
           {totalLogged > 0 && <span className="tnum text-xs text-togo-faint">{formatMinutes(totalLogged)}</span>}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleExport}
-            disabled={entries.length === 0}
-            title="Export these entries to Excel (.xlsx)"
-            aria-label="Export to Excel"
-          >
-            <Download size={14} />
-          </Button>
+          {/* Import is super admin only (and enforced again server-side): it
+              writes rows on someone else's behalf in bulk, with dates and
+              durations that never went through the normal form — a migration
+              tool, not a day-to-day control.
+
+              With both actions available they share one menu rather than sitting
+              as two near-identical arrow icons; with only export available the
+              menu would be a dropdown of one, so it stays a plain button. */}
+          {currentUser?.isSuperAdmin ? (
+            <div ref={dataMenuRef} className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDataMenuOpen((o) => !o)}
+                aria-expanded={dataMenuOpen}
+                aria-haspopup="menu"
+                title="Export or import this time log"
+                aria-label="Export or import"
+              >
+                <ArrowDownUp size={14} />
+              </Button>
+
+              {dataMenuOpen && (
+                <div
+                  role="menu"
+                  className="animate-fade-in absolute right-0 z-40 mt-1.5 w-56 overflow-hidden rounded-md border border-togo-border bg-togo-surface shadow-[var(--shadow-modal)]"
+                >
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setDataMenuOpen(false);
+                      handleExport();
+                    }}
+                    disabled={entries.length === 0}
+                    className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--togo-hover)] disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    <Download size={14} className="mt-0.5 shrink-0 text-togo-blue" />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-medium text-togo-white">Export to Excel</span>
+                      <span className="block text-[10px] text-togo-faint">
+                        {entries.length === 0
+                          ? "Nothing logged yet"
+                          : `${entries.length} ${entries.length === 1 ? "entry" : "entries"} as .xlsx`}
+                      </span>
+                    </span>
+                  </button>
+
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setDataMenuOpen(false);
+                      setImportModalOpen(true);
+                    }}
+                    className="flex w-full items-start gap-2.5 border-t border-togo-border px-3 py-2.5 text-left transition-colors hover:bg-[var(--togo-hover)]"
+                  >
+                    <Upload size={14} className="mt-0.5 shrink-0 text-togo-blue" />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-medium text-togo-white">Import from spreadsheet</span>
+                      <span className="block text-[10px] text-togo-faint">Map columns from .xlsx, .xls or .csv</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleExport}
+              disabled={entries.length === 0}
+              title="Export these entries to Excel (.xlsx)"
+              aria-label="Export to Excel"
+            >
+              <Download size={14} />
+            </Button>
+          )}
           {/* Clients read the time log; they don't add to it. Export stays —
               taking a copy of what's already there is still watching. */}
           {canLogWork && (
@@ -252,7 +341,18 @@ export function ProjectTimeSection({ projectName,
                     )}
                     {isVisible("note") && (
                       <td className="max-w-xs px-4 py-3 text-togo-muted">
-                        {e.note || <span className="text-togo-faint">—</span>}
+                        {e.note ? (
+                          // Clamped to three lines. An imported note is often a
+                          // whole day's work as one "- did this. - did that."
+                          // string, which made a single row taller than the rest
+                          // of the table put together. The full text is on hover,
+                          // and in the row's own modal.
+                          <span className="line-clamp-3" title={e.note}>
+                            {e.note}
+                          </span>
+                        ) : (
+                          <span className="text-togo-faint">—</span>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -275,12 +375,23 @@ export function ProjectTimeSection({ projectName,
       <StartTimerModal
         open={startModalOpen}
         onClose={() => setStartModalOpen(false)}
-        onStart={(project, phase, workDone) => {
-          start(project, phase, workDone);
+        onStart={(project, phase, workDone, workType) => {
+          start(project, phase, workDone, workType);
           setStartModalOpen(false);
         }}
         lockProject={projectName}
       />
+
+      {currentUser?.isSuperAdmin && (
+        <TimeImportModal
+          open={importModalOpen}
+          onClose={() => setImportModalOpen(false)}
+          onImported={loadEntries}
+          projectName={projectName}
+          currentUser={currentUser}
+          members={members}
+        />
+      )}
 
       {canLogWork && currentUser && (
         <TimeEntryModal

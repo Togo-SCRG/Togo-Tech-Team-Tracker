@@ -7,6 +7,7 @@ import { SortableHeader } from "@/components/ui/SortableHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn, formatDateShort } from "@/lib/utils";
 import { isRealBlocker } from "@/lib/blockers";
+import { isTask } from "@/lib/workType";
 import type { SortState } from "@/lib/useSort";
 import { TEN_ROWS_TRACKER } from "@/lib/tableHeights";
 import type { DailyUpdateItem } from "@/types";
@@ -144,7 +145,22 @@ export function TableView({
   function renderCell(c: TrackerColumn, u: DailyUpdateItem) {
     switch (c.key) {
       case "project":
-        return <span className="whitespace-nowrap font-medium text-togo-white">{u.project}</span>;
+        return (
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="font-medium text-togo-white">{u.project}</span>
+            {/* Marks the row as non-project work. Without it a task sits in this
+                column looking exactly like a project that's missing from the
+                projects list. */}
+            {isTask(u.workType) && (
+              <span
+                title="A task, not a project"
+                className="shrink-0 rounded border border-togo-border bg-togo-surface-2 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-togo-faint"
+              >
+                Task
+              </span>
+            )}
+          </span>
+        );
 
       case "task":
         // The avatar lives in its own leading column, not in here — see below.

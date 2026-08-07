@@ -5,6 +5,7 @@ import type { AccessLevel } from "@/types";
 import { ensureMemberProject } from "@/lib/memberProjects";
 import { notify } from "@/lib/notifications";
 import { syncProjectStatus } from "@/lib/syncProjectStatus";
+import { normaliseWorkType } from "@/lib/workType";
 
 function toCamel(row: any) {
   return {
@@ -15,6 +16,7 @@ function toCamel(row: any) {
       : undefined,
     date: row.date,
     project: row.project,
+    workType: normaliseWorkType(row.work_type),
     update: row.update,
     whatsLeft: row.whats_left,
     timeline: row.timeline,
@@ -95,16 +97,22 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { userId, date, project, update, whatsLeft, timeline, blockers, status } = body;
+  const workType = normaliseWorkType(body.workType);
+  const isTaskEntry = workType === "task";
 
   if (!project || !date) {
-    return NextResponse.json({ error: "Project and date are required." }, { status: 400 });
+    return NextResponse.json(
+      { error: `${isTaskEntry ? "Task" : "Project"} and date are required.` },
+      { status: 400 }
+    );
   }
 
   // Projects aren't a table — typing a name nobody has used before in the log
   // form creates one just as surely as the New Project button does, so it gets
   // the same announcement. Checked before the insert, or the row we're about to
-  // write would make every project look pre-existing.
-  const projectExisted = await projectAlreadyExists(supabase, project);
+  // write would make every project look pre-existing. Tasks announce nothing:
+  // "Meetings" is not a new project and nobody needs telling about it.
+  const projectExisted = isTaskEntry ? true : await projectAlreadyExists(supabase, project);
 
   const { data, error } = await supabase
     .from("daily_updates")
@@ -112,6 +120,7 @@ export async function POST(req: NextRequest) {
       user_id: userId || user.id,
       date,
       project,
+      work_type: workType,
       update: update || "",
       whats_left: whatsLeft || "",
       timeline: timeline || "",
@@ -126,12 +135,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status });
   }
 
-  await ensureMemberProject(supabase, data.user_id, project, status || "In Progress");
+  // Both of these are project bookkeeping, and a task is not a project: it has
+  // no team to join and no status of its own to carry. Running either would put
+  // the task in the projects list, which is the whole thing tasks exist to avoid.
+  if (!isTaskEntry) {
+    await ensureMemberProject(supabase, data.user_id, project, status || "In Progress");
 
-  // The form's status field is the *project's* status, so it lands on the
-  // project too. After ensureMemberProject, because logging an update is what
-  // makes the author a member — which is what the status trigger checks.
-  await syncProjectStatus(supabase, project, status || "In Progress");
+    // The form's status field is the *project's* status, so it lands on the
+    // project too. After ensureMemberProject, because logging an update is what
+    // makes the author a member — which is what the status trigger checks.
+    await syncProjectStatus(supabase, project, status || "In Progress");
+  }
 
   if (!projectExisted) {
     const { data: everyone } = await supabase.from("profiles").select("id");

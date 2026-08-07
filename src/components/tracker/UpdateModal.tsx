@@ -8,6 +8,8 @@ import { Select, Label } from "@/components/ui/Input";
 import { DateField } from "@/components/ui/DateField";
 import { Combobox } from "@/components/ui/Combobox";
 import { BulletTextarea } from "@/components/ui/BulletTextarea";
+import { WorkTypeToggle } from "@/components/ui/WorkTypeToggle";
+import { normaliseWorkType, type WorkType } from "@/lib/workType";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { STATUS_OPTIONS, toDateInputValue } from "@/lib/utils";
@@ -22,6 +24,8 @@ interface Props {
   editingUpdate: DailyUpdateItem | null;
   defaultDate: string;
   existingProjects?: string[];
+  /** Names already used for non-project work, for the Task suggestions. */
+  existingTasks?: string[];
   /**
    * Show the member picker — set by the "Log member update" button, not
    * inferred from the tier. Logging for someone else is now its own permission
@@ -39,12 +43,14 @@ export function UpdateModal({
   editingUpdate,
   defaultDate,
   existingProjects = [],
+  existingTasks = [],
   allowMemberPick = false,
 }: Props) {
   const toast = useToast();
   const [userId, setUserId] = useState(currentUser.id);
   const [date, setDate] = useState(defaultDate);
   const [project, setProject] = useState("");
+  const [workType, setWorkType] = useState<WorkType>("project");
   const [update, setUpdate] = useState("");
   const [whatsLeft, setWhatsLeft] = useState("");
   const [blockers, setBlockers] = useState("");
@@ -63,6 +69,7 @@ export function UpdateModal({
       setUserId(editingUpdate.userId);
       setDate(toDateInputValue(editingUpdate.date));
       setProject(editingUpdate.project);
+      setWorkType(normaliseWorkType(editingUpdate.workType));
       setUpdate(editingUpdate.update);
       setWhatsLeft(editingUpdate.whatsLeft || "");
       setBlockers(editingUpdate.blockers || "");
@@ -71,6 +78,7 @@ export function UpdateModal({
       setUserId(currentUser.id);
       setDate(defaultDate);
       setProject("");
+      setWorkType("project");
       setUpdate("");
       setWhatsLeft("");
       setBlockers("");
@@ -110,7 +118,7 @@ export function UpdateModal({
     setSaving(true);
     setError(null);
 
-    const payload = { userId, date, project, update, whatsLeft, blockers, status };
+    const payload = { userId, date, project, workType, update, whatsLeft, blockers, status };
 
     try {
       const res = editingUpdate
@@ -209,32 +217,59 @@ export function UpdateModal({
               required
             />
           </div>
-          <div>
-            {/* "Project status", not "Status": this field moves the whole
-                project, not just this one row. The column in the database is
-                still `status` — only the label changed. */}
-            <Label htmlFor="update-status" hint={syncingStatus ? "Loading…" : undefined}>
-              Project status
-            </Label>
-            <Select id="update-status" value={status} onChange={(e) => setStatus(e.target.value)}>
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </Select>
-          </div>
+          {/* Hidden for a task: this field moves a *project's* status, and a
+              task has none. The server ignores it on a task row rather than
+              trusting the form, so leaving it visible would be a control that
+              silently does nothing. */}
+          {workType === "project" && (
+            <div>
+              {/* "Project status", not "Status": this field moves the whole
+                  project, not just this one row. The column in the database is
+                  still `status` — only the label changed. */}
+              <Label htmlFor="update-status" hint={syncingStatus ? "Loading…" : undefined}>
+                Project status
+              </Label>
+              <Select id="update-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
         </div>
 
         <div>
-          <Label required hint="Pick an existing project or type a new name">
-            Project
-          </Label>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <Label
+              required
+              className="mb-0"
+              hint={
+                workType === "task"
+                  ? "Pick an existing task or type a new name"
+                  : "Pick an existing project or type a new name"
+              }
+            >
+              {workType === "task" ? "Task" : "Project"}
+            </Label>
+            {/* Work that isn't a project — meetings, admin, support — still gets
+                logged, it just doesn't create or move a project. */}
+            <WorkTypeToggle
+              value={workType}
+              onChange={(next) => {
+                setWorkType(next);
+                // The two name lists are separate, so a half-typed project name
+                // is meaningless as a task and vice versa.
+                setProject("");
+              }}
+            />
+          </div>
           <Combobox
             value={project}
             onChange={setProject}
-            options={existingProjects}
-            placeholder="e.g. QuikSkope V2"
+            options={workType === "task" ? existingTasks : existingProjects}
+            placeholder={workType === "task" ? "e.g. Meetings" : "e.g. QuikSkope V2"}
             required
           />
         </div>

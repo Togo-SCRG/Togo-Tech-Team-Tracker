@@ -1,3 +1,5 @@
+import type { WorkType } from "@/lib/workType";
+
 export type AccessLevel = "super_admin" | "admin" | "client" | "user";
 
 export interface CurrentUser {
@@ -29,7 +31,9 @@ export interface DailyUpdateItem {
   userId: string;
   user: UpdateUser;
   date: string;
+  /** The project or task name — which of the two is decided by `workType`. */
   project: string;
+  workType?: WorkType;
   update: string;
   whatsLeft?: string | null;
   timeline?: string | null;
@@ -43,7 +47,9 @@ export interface TimeEntryItem {
   id: string;
   userId: string;
   user: UpdateUser;
+  /** The project or task name — which of the two is decided by `workType`. */
   project: string;
+  workType?: WorkType;
   phase?: string | null;
   date: string;
   durationMinutes: number;

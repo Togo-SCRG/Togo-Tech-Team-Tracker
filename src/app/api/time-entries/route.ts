@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureMemberProject } from "@/lib/memberProjects";
+import { normaliseWorkType } from "@/lib/workType";
 
 function toCamel(row: any) {
   return {
@@ -10,6 +11,7 @@ function toCamel(row: any) {
       ? { id: row.profiles.id, name: row.profiles.name, avatarUrl: row.profiles.avatar_url, role: row.profiles.role }
       : undefined,
     project: row.project,
+    workType: normaliseWorkType(row.work_type),
     phase: row.phase,
     date: row.date,
     durationMinutes: row.duration_minutes,
@@ -67,9 +69,13 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { userId, project, phase, date, durationMinutes, note } = body;
+  const workType = normaliseWorkType(body.workType);
 
   if (!project || !date || !durationMinutes) {
-    return NextResponse.json({ error: "Project, date, and duration are required." }, { status: 400 });
+    return NextResponse.json(
+      { error: `${workType === "task" ? "Task" : "Project"}, date, and duration are required.` },
+      { status: 400 }
+    );
   }
 
   const { data, error } = await supabase
@@ -77,6 +83,7 @@ export async function POST(req: NextRequest) {
     .insert({
       user_id: userId || user.id,
       project,
+      work_type: workType,
       phase: phase || "",
       date,
       duration_minutes: durationMinutes,
@@ -90,7 +97,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status });
   }
 
-  await ensureMemberProject(supabase, data.user_id, project, "In Progress");
+  // Only project work puts you on a project. A task has no team to join, and
+  // creating a member_projects row for one would list it as a project.
+  if (workType === "project") {
+    await ensureMemberProject(supabase, data.user_id, project, "In Progress");
+  }
 
   return NextResponse.json({ entry: toCamel(data) }, { status: 201 });
 }

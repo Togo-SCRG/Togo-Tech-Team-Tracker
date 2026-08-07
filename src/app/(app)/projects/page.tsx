@@ -22,11 +22,15 @@ export default async function ProjectsPage() {
     standaloneBlockers,
   ] = await Promise.all([
       supabase.from("member_projects").select("*, profiles(id, name, avatar_url, role)"),
+      // Project work only. A task ("Meetings", "Support") is logged in these
+      // same tables but is not a project, so it must not appear in this list or
+      // contribute hours to one.
       supabase
         .from("daily_updates")
         .select("*, profiles(id, name, avatar_url, role)")
+        .eq("work_type", "project")
         .order("date", { ascending: false }),
-      supabase.from("time_entries").select("project, duration_minutes"),
+      supabase.from("time_entries").select("project, duration_minutes").eq("work_type", "project"),
       supabase
         .from("profiles")
         .select("id, name, invited_at, signed_in_at")

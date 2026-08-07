@@ -8,6 +8,7 @@ function toCamel(data: {
   prd: string | null;
   timeline: string | null;
   status: string;
+  side_note?: string | null;
 }) {
   return {
     project: data.project,
@@ -16,6 +17,7 @@ function toCamel(data: {
     prd: data.prd,
     timeline: data.timeline,
     status: data.status,
+    sideNote: data.side_note ?? null,
   };
 }
 
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("project_settings")
-    .select("project, weekly_hour_cap, overview, prd, timeline, status")
+    .select("project, weekly_hour_cap, overview, prd, timeline, status, side_note")
     .eq("project", project)
     .maybeSingle();
 
@@ -46,7 +48,17 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    settings: toCamel(data || { project, weekly_hour_cap: null, overview: null, prd: null, timeline: null, status: "Not Started" }),
+    settings: toCamel(
+      data || {
+        project,
+        weekly_hour_cap: null,
+        overview: null,
+        prd: null,
+        timeline: null,
+        status: "Not Started",
+        side_note: null,
+      }
+    ),
   });
 }
 
@@ -61,7 +73,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { project, weeklyHourCap, overview, prd, timeline, status } = body;
+  const { project, weeklyHourCap, overview, prd, timeline, status, sideNote } = body;
   if (!project) {
     return NextResponse.json({ error: "project is required." }, { status: 400 });
   }
@@ -72,11 +84,12 @@ export async function PATCH(req: NextRequest) {
   if (prd !== undefined) upsertData.prd = prd;
   if (timeline !== undefined) upsertData.timeline = timeline;
   if (status !== undefined) upsertData.status = status;
+  if (sideNote !== undefined) upsertData.side_note = sideNote;
 
   const { data, error } = await supabase
     .from("project_settings")
     .upsert(upsertData, { onConflict: "project" })
-    .select("project, weekly_hour_cap, overview, prd, timeline, status")
+    .select("project, weekly_hour_cap, overview, prd, timeline, status, side_note")
     .single();
 
   if (error) {

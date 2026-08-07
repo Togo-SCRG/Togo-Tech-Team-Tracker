@@ -67,6 +67,7 @@ export default function TrackerPage() {
   const [minutesByKey, setMinutesByKey] = useState<Record<string, number>>({});
   const [members, setMembers] = useState<MemberItem[]>([]);
   const [projectNames, setProjectNames] = useState<string[]>([]);
+  const [taskNames, setTaskNames] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -136,6 +137,7 @@ export default function TrackerPage() {
       if (projectsRes.ok) {
         const projectsData = await projectsRes.json();
         setProjectNames(projectsData.projects || []);
+        setTaskNames(projectsData.tasks || []);
       }
       setLoading(false);
     }
@@ -620,6 +622,7 @@ export default function TrackerPage() {
         editingUpdate={editingUpdate}
         defaultDate={today}
         existingProjects={projectNames}
+        existingTasks={taskNames}
         allowMemberPick={modalMode === "add" && canLogOthers}
       />
 

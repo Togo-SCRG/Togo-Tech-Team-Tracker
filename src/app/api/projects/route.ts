@@ -5,6 +5,11 @@ import { notify } from "@/lib/notifications";
 // Distinct project names across every place a project can be named, so
 // pickers (e.g. the update/timer/project-assignment forms) can suggest
 // existing projects while still letting the user type a brand new one.
+//
+// Also returns the distinct *task* names, from the same two logging tables —
+// tasks are named the same free-text way, so the same picker serves both. They
+// are kept in a separate list rather than merged: a task is never a project, and
+// anything that assigns, renames or reports on projects must not see them.
 export async function GET() {
   const supabase = createClient();
 
@@ -17,19 +22,30 @@ export async function GET() {
 
   const [{ data: dailyUpdates }, { data: timeEntries }, { data: memberProjects }, { data: projectSettings }] =
     await Promise.all([
-      supabase.from("daily_updates").select("project"),
-      supabase.from("time_entries").select("project"),
+      supabase.from("daily_updates").select("project, work_type"),
+      supabase.from("time_entries").select("project, work_type"),
       supabase.from("member_projects").select("project"),
       supabase.from("project_settings").select("project"),
     ]);
 
   const names = new Set<string>();
-  for (const rows of [dailyUpdates, timeEntries, memberProjects, projectSettings]) {
-    for (const row of rows || []) names.add(row.project);
+  const taskNames = new Set<string>();
+
+  for (const row of [...(dailyUpdates || []), ...(timeEntries || [])]) {
+    // `work_type` is undefined until migration 040 runs; treat that as project
+    // work, which is what every existing row is.
+    if ((row as { work_type?: string }).work_type === "task") taskNames.add(row.project);
+    else names.add(row.project);
+  }
+  for (const row of [...(memberProjects || []), ...(projectSettings || [])]) {
+    names.add(row.project);
   }
 
-  const projects = Array.from(names).sort((a, b) => a.localeCompare(b));
-  return NextResponse.json({ projects });
+  const byName = (a: string, b: string) => a.localeCompare(b);
+  return NextResponse.json({
+    projects: Array.from(names).sort(byName),
+    tasks: Array.from(taskNames).sort(byName),
+  });
 }
 
 // "Create a new project": sets the project's overview/PRD/timeline in
