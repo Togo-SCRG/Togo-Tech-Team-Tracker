@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { normaliseWorkType } from "@/lib/workType";
 
 function toCamel(row: any) {
   return {
@@ -9,6 +10,7 @@ function toCamel(row: any) {
       ? { id: row.profiles.id, name: row.profiles.name, avatarUrl: row.profiles.avatar_url, role: row.profiles.role }
       : undefined,
     project: row.project,
+    workType: normaliseWorkType(row.work_type),
     phase: row.phase,
     date: row.date,
     durationMinutes: row.duration_minutes,
@@ -29,10 +31,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
-  const { project, phase, date, durationMinutes, note } = body;
+  const { project, phase, date, durationMinutes, note, workType } = body;
 
   const data: Record<string, unknown> = {};
   if (project !== undefined) data.project = project;
+  // Editable, so an entry logged against the wrong kind can be corrected without
+  // deleting and re-adding it.
+  if (workType !== undefined) data.work_type = normaliseWorkType(workType);
   if (phase !== undefined) data.phase = phase;
   if (date !== undefined) data.date = date;
   if (durationMinutes !== undefined) data.duration_minutes = durationMinutes;

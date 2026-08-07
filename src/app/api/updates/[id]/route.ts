@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncProjectStatus } from "@/lib/syncProjectStatus";
+import { normaliseWorkType } from "@/lib/workType";
 
 function toCamel(row: any) {
   return {
@@ -11,6 +12,7 @@ function toCamel(row: any) {
       : undefined,
     date: row.date,
     project: row.project,
+    workType: normaliseWorkType(row.work_type),
     update: row.update,
     whatsLeft: row.whats_left,
     timeline: row.timeline,
@@ -32,11 +34,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
-  const { date, project, update, whatsLeft, timeline, blockers, status } = body;
+  const { date, project, update, whatsLeft, timeline, blockers, status, workType } = body;
 
   const data: Record<string, unknown> = {};
   if (date !== undefined) data.date = date;
   if (project !== undefined) data.project = project;
+  if (workType !== undefined) data.work_type = normaliseWorkType(workType);
   if (update !== undefined) data.update = update;
   if (whatsLeft !== undefined) data.whats_left = whatsLeft;
   if (timeline !== undefined) data.timeline = timeline;
@@ -54,8 +57,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "You can only edit your own updates." }, { status: 403 });
   }
 
-  // Editing the status here moves the project as well, same as logging it does.
-  await syncProjectStatus(supabase, updated.project, status);
+  // Editing the status here moves the project as well, same as logging it does
+  // — but only for project work. Syncing from a task row would move a project
+  // that merely shares its name, from a status the task never really had.
+  if (normaliseWorkType(updated.work_type) === "project") {
+    await syncProjectStatus(supabase, updated.project, status);
+  }
 
   return NextResponse.json({ update: toCamel(updated) });
 }

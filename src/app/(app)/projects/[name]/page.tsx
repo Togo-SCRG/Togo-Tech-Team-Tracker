@@ -6,6 +6,7 @@ import { ProjectTotalLogged } from "@/components/timetracker/ProjectTotalLogged"
 import { ProjectWeeklyCap } from "@/components/timetracker/ProjectWeeklyCap";
 import { ProjectTeamSection } from "@/components/projects/ProjectTeamSection";
 import { ProjectDocs } from "@/components/projects/ProjectDocs";
+import { ProjectSideNotes } from "@/components/projects/ProjectSideNotes";
 import { ProjectStatusBadge } from "@/components/projects/ProjectStatusBadge";
 import { ProjectNameField } from "@/components/projects/ProjectNameField";
 import { ProjectTimelineField } from "@/components/projects/ProjectTimelineField";
@@ -38,10 +39,14 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
         .from("member_projects")
         .select("*, profiles(id, name, avatar_url, role)")
         .eq("project", projectName),
+      // work_type filters throughout: a task can share a name with a project
+      // without being one, and its rows must not appear on the project's page,
+      // its team, its hours or its activity feed.
       supabase
         .from("daily_updates")
         .select("*, profiles(id, name, avatar_url, role)")
         .eq("project", projectName)
+        .eq("work_type", "project")
         .order("date", { ascending: false }),
       // Joined to profiles and carrying phase/note so the activity feed can
       // show "Ed logged 2h on Dev" alongside the daily updates.
@@ -49,13 +54,14 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
         .from("time_entries")
         .select("id, user_id, duration_minutes, date, phase, note, created_at, profiles(name)")
         .eq("project", projectName)
+        .eq("work_type", "project")
         .order("date", { ascending: false }),
       // Overview/PRD/cap are selected here too so those sections render with
       // their real content on first paint instead of fetching it again
       // client-side and shifting the layout when it lands.
       supabase
         .from("project_settings")
-        .select("project, status, overview, prd, timeline, weekly_hour_cap")
+        .select("project, status, overview, prd, timeline, weekly_hour_cap, side_note")
         .eq("project", projectName)
         .maybeSingle(),
       // Blockers raised against the project itself, rather than carried on a
@@ -242,6 +248,14 @@ export default async function ProjectDetailPage({ params }: { params: { name: st
             projectName={projectName}
             initialOverview={projectSettings?.overview ?? ""}
             initialPrd={projectSettings?.prd ?? ""}
+            isProjectMember={viewerIsProjectMember}
+          />
+
+          {/* In the main column rather than the 300px sidebar: bulleted notes
+              need the width to stay readable. */}
+          <ProjectSideNotes
+            projectName={projectName}
+            initialNote={projectSettings?.side_note ?? ""}
             isProjectMember={viewerIsProjectMember}
           />
 

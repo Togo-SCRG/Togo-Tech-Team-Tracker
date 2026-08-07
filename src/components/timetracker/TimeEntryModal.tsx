@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DateField } from "@/components/ui/DateField";
-import { Input, Textarea, Select, Label } from "@/components/ui/Input";
+import { Input, Select, Label } from "@/components/ui/Input";
+import { BulletTextarea } from "@/components/ui/BulletTextarea";
+import { WorkTypeToggle } from "@/components/ui/WorkTypeToggle";
+import { normaliseWorkType, type WorkType } from "@/lib/workType";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { toDateInputValue } from "@/lib/utils";
@@ -42,6 +45,7 @@ export function TimeEntryModal({
   const [hours, setHours] = useState("0");
   const [minutes, setMinutes] = useState("0");
   const [note, setNote] = useState("");
+  const [workType, setWorkType] = useState<WorkType>("project");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -55,6 +59,7 @@ export function TimeEntryModal({
       setHours(String(Math.floor(editingEntry.durationMinutes / 60)));
       setMinutes(String(editingEntry.durationMinutes % 60));
       setNote(editingEntry.note || "");
+      setWorkType(normaliseWorkType(editingEntry.workType));
     } else {
       setUserId(currentUser.id);
       setProject(lockProject || defaultProject || "");
@@ -63,6 +68,8 @@ export function TimeEntryModal({
       setHours("0");
       setMinutes("0");
       setNote("");
+      // A form opened from a project page is project work by definition.
+      setWorkType("project");
     }
     setError(null);
   }, [editingEntry, open, currentUser.id, defaultDate, defaultProject, lockProject]);
@@ -73,7 +80,7 @@ export function TimeEntryModal({
 
     const durationMinutes = Number(hours) * 60 + Number(minutes);
     if (!project.trim()) {
-      setError("Project is required.");
+      setError(`${workType === "task" ? "Task" : "Project"} is required.`);
       return;
     }
     if (!durationMinutes || durationMinutes <= 0) {
@@ -82,7 +89,7 @@ export function TimeEntryModal({
     }
 
     setSaving(true);
-    const payload = { userId, project, phase, date, durationMinutes, note };
+    const payload = { userId, project, workType, phase, date, durationMinutes, note };
 
     try {
       const res = editingEntry
@@ -151,13 +158,23 @@ export function TimeEntryModal({
           </div>
         )}
 
+        {/* Hidden when the form is opened from a project page — that entry is
+            against this project by definition, so offering "Task" would be a
+            choice the form can't honour. */}
+        {!lockProject && (
+          <div>
+            <Label>Logged against</Label>
+            <WorkTypeToggle value={workType} onChange={setWorkType} />
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label>Project</Label>
+            <Label>{workType === "task" ? "Task" : "Project"}</Label>
             <Input
               value={project}
               onChange={(e) => setProject(e.target.value)}
-              placeholder="e.g. QuikSkope V2"
+              placeholder={workType === "task" ? "e.g. Meetings" : "e.g. QuikSkope V2"}
               disabled={!!lockProject}
               required
             />
@@ -169,11 +186,14 @@ export function TimeEntryModal({
         </div>
 
         <div>
-          <Label>What Was Done</Label>
-          <Textarea
-            rows={2}
+          {/* Same control as the Update field on the log-update form: a session
+              is usually several things done, not one sentence. Draggable to
+              expand, since an imported day's work can run long. */}
+          <Label hint="Press Enter for a new bullet">What Was Done</Label>
+          <BulletTextarea
+            rows={3}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={setNote}
             placeholder="Describe the work done during this time"
           />
         </div>

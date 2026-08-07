@@ -64,7 +64,15 @@ export default async function DashboardPage() {
       .select("*, profiles(id, name, avatar_url, role)")
       .order("created_at", { ascending: false })
       .limit(50),
-    supabase.from("daily_updates").select("project, status, date").order("date", { ascending: false }),
+    // Project work only: this drives the project rollup behind "Total projects"
+    // and the six status tiles, and a task has no status of its own to count.
+    supabase
+      .from("daily_updates")
+      .select("project, status, date")
+      .eq("work_type", "project")
+      .order("date", { ascending: false }),
+    // Deliberately NOT filtered: an hour in a meeting is still an hour tracked,
+    // so it belongs in today's total and in the Hrs column.
     supabase.from("time_entries").select("project, user_id, date, duration_minutes"),
     supabase.from("project_settings").select("project, status, weekly_hour_cap"),
     // Outstanding blockers, every project, every date — deliberately not
@@ -79,6 +87,7 @@ export default async function DashboardPage() {
     supabase
       .from("daily_updates")
       .select("id, project, blockers, date, profiles(name)")
+      .eq("work_type", "project")
       .not("blockers", "is", null)
       .neq("blockers", "")
       .order("date", { ascending: false }),
